@@ -7,6 +7,21 @@
         <attribute name="action">app.fullscreen</attribute>
       </item>
       <item>
+        <attribute name="accel">F4</attribute>
+        <attribute name="label" translatable="yes">_Borderless</attribute>
+        <attribute name="action">app.borderless</attribute>
+      </item>
+      <item>
+        <attribute name="accel">F5</attribute>
+        <attribute name="label" translatable="yes">_Action Bar</attribute>
+        <attribute name="action">app.actionbar</attribute>
+      </item>
+      <item>
+        <attribute name="accel">F6</attribute>
+        <attribute name="label" translatable="yes">_Thumbnails Bar</attribute>
+        <attribute name="action">app.thumbnails</attribute>
+      </item>
+      <item>
         <attribute name="label" translatable="yes">P_references</attribute>
         <attribute name="action">app.preferences</attribute>
       </item>

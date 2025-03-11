@@ -43,6 +43,9 @@ public class Cheese.Application : Gtk.Application
         { "mode", on_action_radio, "s", "'photo'", on_mode_change },
         { "fullscreen", on_action_toggle, null, "false",
           on_fullscreen_change },
+        { "borderless", on_action_toggle, null, "false", on_borderless_change },
+        { "actionbar", on_action_toggle, null, "true", on_actionbar_change },
+        { "thumbnails", on_action_toggle, null, "true", on_thumbnailsbar_change },
         { "wide-mode", on_action_toggle, null, "false", on_wide_mode_change },
         { "effects", on_action_toggle, null, "false", on_effects_change },
         { "preferences", on_preferences },
@@ -61,6 +64,12 @@ public class Cheese.Application : Gtk.Application
           N_("Output version information and exit"), null },
         { "fullscreen", 'f', 0, OptionArg.NONE, null,
           N_("Start in fullscreen mode"), null },
+        { "borderless", 'b', 0, OptionArg.NONE, null,
+          N_("Start in borderless mode"), null },
+        { "noactionbar", 'n', 0, OptionArg.NONE, null,
+          N_("Start with toolbar hidden"), null },
+        { "nothumbnails", 'm', 0, OptionArg.NONE, null,
+          N_("Start with gallery bar hidden"), null },
         { null }
     };
 
@@ -164,6 +173,21 @@ public class Cheese.Application : Gtk.Application
         if (opts.contains ("fullscreen"))
         {
             activate_action ("fullscreen", null);
+        }
+
+        if (opts.contains ("borderless"))
+        {
+            activate_action ("borderless", null);
+        }
+
+        if (opts.contains ("noactionbar"))
+        {
+            activate_action ("actionbar", null);
+        }
+
+        if (opts.contains ("nothumbnails"))
+        {
+            activate_action ("thumbnails", null);
         }
 
         if (opts.contains ("wide"))
@@ -404,6 +428,66 @@ public class Cheese.Application : Gtk.Application
         action.set_state (value);
     }
 
+    /**
+     * Handle the borderless state being changed.
+     *
+     * @param action the action that emitted the signal
+     * @param value the state to switch to
+     */
+     private void on_borderless_change (SimpleAction action, Variant? value)
+     {
+         return_if_fail (value != null);
+ 
+         var state = value.get_boolean ();
+ 
+         // Action can be activated before activate ().
+         common_init ();
+ 
+         main_window.set_borderless (state);
+ 
+         action.set_state (value);
+     }
+ 
+    /**
+     * Handle the action bar state being changed.
+     *
+     * @param action the action that emitted the signal
+     * @param value the state to switch to
+     */
+     private void on_actionbar_change (SimpleAction action, Variant? value)
+     {
+         return_if_fail (value != null);
+ 
+         var state = value.get_boolean ();
+ 
+         // Action can be activated before activate ().
+         common_init ();
+ 
+         main_window.set_actionbar (state);
+ 
+         action.set_state (value);
+     }
+ 
+    /**
+     * Handle the thumbnails bar state being changed.
+     *
+     * @param action the action that emitted the signal
+     * @param value the state to switch to
+     */
+     private void on_thumbnailsbar_change (SimpleAction action, Variant? value)
+     {
+         return_if_fail (value != null);
+ 
+         var state = value.get_boolean ();
+ 
+         // Action can be activated before activate ().
+         common_init ();
+ 
+         main_window.set_thumbnailsbar (state);
+ 
+         action.set_state (value);
+     }
+ 
     /**
      * Handle the wide-mode state being changed.
      *
