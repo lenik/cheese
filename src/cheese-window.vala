@@ -91,6 +91,9 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
   private List<Clutter.Actor> effects_grids;
 
   private bool is_fullscreen;
+  private bool is_borderless;
+  private bool is_actionbar_visible = true;
+  private bool is_thumbnailsbar_visible = true;
   private bool is_wide_mode;
   private bool is_recording;       /* Video Recording Flag */
   private bool is_bursting;
@@ -410,6 +413,36 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     }
 
     /**
+     * Toggle borderless mode.
+     *
+     * @param borderless whether the window border should be visible
+     */
+     public void set_borderless (bool borderless)
+     {
+         set_borderless_mode (borderless);
+     }
+
+    /**
+     * Toggle action bar mode.
+     *
+     * @param actionbar whether the window should be visible
+     */
+     public void set_actionbar (bool actionbar)
+     {
+         set_actionbar_visible (actionbar);
+     }
+
+    /**
+     * Toggle thumbnails bar mode.
+     *
+     * @param thumbnailsbar whether the thumbnails bar should be visible
+     */
+     public void set_thumbnailsbar (bool thumbnailsbar)
+     {
+         set_thumbnailsbar_visible (thumbnailsbar);
+     }
+  
+    /**
      * Make the media capture mode actions sensitive.
      */
     private void enable_mode_change ()
@@ -589,6 +622,78 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     }
   }
 
+    /**
+   * Enable or disable window border mode to the requested state.
+     *
+     * @param visible whether to show or hide the action bar
+     */
+     private void set_borderless_mode (bool borderless)
+     {
+         is_borderless = borderless;
+         if (borderless)
+         {
+             // hide border
+            this.decorated = false;
+         }
+         else
+         {
+             // show border
+            this.decorated = true;
+         }
+     }
+  
+    /**
+     * Show or hide the action bar.
+     *
+     * @param visible whether to show or hide the action bar
+     */
+    private void set_actionbar_visible (bool visible)
+    {
+        is_actionbar_visible = visible;
+        if (visible)
+        {
+            buttons_area.show ();
+        }
+        else
+        {
+            buttons_area.hide ();
+        }
+    }
+ 
+    /**
+     * Show or hide the action bar.
+     *
+     * @param visible whether to show or hide the action bar
+     */
+    public void set_thumbnailsbar_visible (bool visible)
+    {
+        is_thumbnailsbar_visible = visible;
+        if (is_fullscreen)
+            visible = false;
+        if (visible)
+        {
+            if (is_wide_mode)
+            {
+                thumbnails_right.show ();
+            }
+            else
+            {
+                thumbnails_bottom.show ();
+            }
+        }
+        else
+        {
+            if (is_wide_mode)
+            {
+                thumbnails_right.hide ();
+            }
+            else
+            {
+                thumbnails_bottom.hide ();
+            }
+        }
+    }
+ 
   /**
    * Enable or disable wide mode to the requested state.
    *
@@ -1306,6 +1411,9 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         
         application.set_accels_for_action ("app.quit", {"<Primary>q"});
         application.set_accels_for_action ("app.fullscreen", {"F11"});
+        application.set_accels_for_action ("app.borderless", {"F4"});
+        application.set_accels_for_action ("app.actionbar", {"F5"});
+        application.set_accels_for_action ("app.thumbnails", {"F6"});
         application.set_accels_for_action ("win.file-open", {"<Primary>o"});
         application.set_accels_for_action ("win.file-saveas", {"<Primary>s"});
         application.set_accels_for_action ("win.file-trash", {"Delete"});
