@@ -67,11 +67,11 @@ public class Cheese.Application : Gtk.Application
         { "borderless", 'b', 0, OptionArg.NONE, null,
           N_("Start in borderless mode"), null },
         { "noactionbar", 'n', 0, OptionArg.NONE, null,
-          N_("Start with toolbar hidden"), null },
+          N_("Start with action bar (buttons) toggled off"), null },
         { "nothumbnails", 'm', 0, OptionArg.NONE, null,
-          N_("Start with gallery bar hidden"), null },
+          N_("Start with thumbnails view toggled off"), null },
         { "topmost", 't', 0, OptionArg.NONE, null,
-          N_("Make the main window topmost"), null },
+          N_("Keep the main window above"), null },
         { null }
     };
 
