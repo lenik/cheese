@@ -70,6 +70,8 @@ public class Cheese.Application : Gtk.Application
           N_("Start with toolbar hidden"), null },
         { "nothumbnails", 'm', 0, OptionArg.NONE, null,
           N_("Start with gallery bar hidden"), null },
+        { "topmost", 't', 0, OptionArg.NONE, null,
+          N_("Make the main window topmost"), null },
         { null }
     };
 
@@ -196,6 +198,11 @@ public class Cheese.Application : Gtk.Application
         }
 
         this.activate ();
+
+        if (opts.contains ("topmost"))
+        {
+            main_window.set_keep_above(true);
+        }
 
         return 0;
     }
