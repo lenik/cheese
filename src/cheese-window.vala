@@ -100,6 +100,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
   private bool is_effects_selector_active;
   private bool action_cancelled;
     private bool was_maximized;
+    private bool was_keep_above;
 
   private Cheese.Camera   camera;
   private Cheese.FileUtil fileutil;
@@ -141,6 +142,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     {
         was_maximized = (((event.new_window_state - event.changed_mask)
                           & Gdk.WindowState.MAXIMIZED) != 0);
+        was_keep_above = (((event.new_window_state - event.changed_mask)
+                          & Gdk.WindowState.ABOVE) != 0);
 
         window_state_event.disconnect (on_window_state_change_event);
         return false;
