@@ -648,6 +648,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             this.button_press_event.connect (on_button_press);
             this.button_release_event.connect (on_button_release);
             this.motion_notify_event.connect (on_motion_notify);
+            this.key_press_event.connect (on_key_press);
          }
          else
          {
@@ -657,6 +658,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             this.button_press_event.disconnect (on_button_press);
             this.button_release_event.disconnect (on_button_release);
             this.motion_notify_event.disconnect (on_motion_notify);
+            this.key_press_event.disconnect (on_key_press);
          }
      }
   
@@ -1648,6 +1650,32 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 resize (new_width, new_height);
         }
         return true;
+    }
+
+    private bool on_key_press (Gdk.EventKey event)
+    {
+        switch (event.keyval) {
+        case 'h':
+            select_effect_by_name("Flip");
+            break;
+        case 'v':
+            select_effect_by_name("Flip Vertical");
+            break;
+        }
+        return false;
+    }
+    
+    private void select_effect_by_name(string name) {
+        if (selected_effect.name == name) {
+            // toggle off
+            name = "No Effect";
+        }
+        Effect effect = effects_manager.get_effect (name);
+        if (effect!= null) {
+            this.selected_effect = effect;
+            camera.set_effect (selected_effect);
+            settings.set_string ("selected-effect", selected_effect.name);
+        }
     }
 
 }
