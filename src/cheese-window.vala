@@ -110,6 +110,13 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
   private Cheese.Effect selected_effect;
 
+  private bool button_down = false;
+  private bool button_move_or_resize;
+  private double button_down_x;
+  private double button_down_y;
+  private int button_down_width;
+  private int button_down_height;
+
   /**
    * Responses from the delete files confirmation dialog.
    *
@@ -637,11 +644,19 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
          {
              // hide border
             this.decorated = false;
+
+            this.button_press_event.connect (on_button_press);
+            this.button_release_event.connect (on_button_release);
+            this.motion_notify_event.connect (on_motion_notify);
          }
          else
          {
              // show border
             this.decorated = true;
+
+            this.button_press_event.disconnect (on_button_press);
+            this.button_release_event.disconnect (on_button_release);
+            this.motion_notify_event.disconnect (on_motion_notify);
          }
      }
   
@@ -1569,4 +1584,70 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         this.camera = camera;
         set_switch_camera_button_state ();
      }
+
+    private bool on_button_press (Gtk.Widget widget,
+                                  Gdk.EventButton event)
+    {
+        if (event.type != Gdk.EventType.BUTTON_PRESS)
+            return false;
+
+        switch (event.button) {
+            case 1:
+                button_move_or_resize = true;
+                break;
+            case 3:
+                button_move_or_resize = false;
+                get_size (out button_down_width, out button_down_height);
+                break;
+            default:
+                return false;
+        }
+
+        button_down = true;
+        button_down_x = event.x;
+        button_down_y = event.y;
+        return true;
+    }
+
+    private bool on_button_release (Gtk.Widget widget,
+                                    Gdk.EventButton event)
+    {
+        if (button_down) {
+            button_down = false;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private bool on_motion_notify (Gtk.Widget widget,
+                                   Gdk.EventMotion event)
+    {
+        if (! button_down)
+            return false;
+
+        int dx = (int) (event.x - button_down_x);
+        int dy = (int) (event.y - button_down_y);
+
+        if (button_move_or_resize) {
+            // Dragging the window
+            int left, top;
+            get_position (out left, out top);
+            int new_left = left + dx;
+            int new_top = top + dy;
+            move (new_left, new_top);
+        } else {
+            int width, height;
+            get_size (out width, out height);
+            // Resizing the window
+            int new_width = button_down_width + dx;
+            int new_height = button_down_height + dy;
+
+            // resize only when necessary
+            if (width != new_width || height != new_height)
+                resize (new_width, new_height);
+        }
+        return true;
+    }
+
 }
