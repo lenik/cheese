@@ -55,6 +55,10 @@ public class Cheese.Application : Gtk.Application
         { "quit", on_quit }
     };
 
+    private static int follow_interval = 1000;
+    private static int follow_dx = 10;
+    private static int follow_dy = 10;
+
     const OptionEntry[] options = {
         { "wide", 'w', 0, OptionArg.NONE, null, N_("Start in wide mode"),
           null  },
@@ -72,6 +76,14 @@ public class Cheese.Application : Gtk.Application
           N_("Start with thumbnails view toggled off"), null },
         { "topmost", 't', 0, OptionArg.NONE, null,
           N_("Keep the main window above"), null },
+        { "follow", 'c', 0, OptionArg.NONE, null,
+          N_("Make the window position follow the cursor on the screen"), null },
+        { "follow-interval", 0, 0, OptionArg.INT, ref follow_interval,
+          N_("Adjust the responsiveness of cursor following in ms, default 1000"), N_("INTERVAL") },
+        { "follow-dx", 'x', 0, OptionArg.INT, ref follow_dx,
+          N_("Specify the x-offset of the top-left of the window to the cursor"), N_("PIXELS") },
+        { "follow-dy", 'y', 0, OptionArg.INT, ref follow_dy,
+          N_("Specify the y-offset of the top-left of the window to the cursor"), N_("PIXELS") },
         { null }
     };
 
@@ -204,6 +216,10 @@ public class Cheese.Application : Gtk.Application
             main_window.set_keep_above(true);
         }
 
+        if (opts.contains ("follow"))
+        {
+            setup_timers();
+        }
         return 0;
     }
 
@@ -217,6 +233,34 @@ public class Cheese.Application : Gtk.Application
         }
 
         return -1;
+    }
+
+    private void setup_timers() {
+        GLib.Timeout.add (follow_interval, follow_the_mouse);
+    }
+
+    private bool follow_the_mouse() {
+        Gdk.Display display = Gdk.Display.get_default ();
+        if (display == null)
+            return false; // G_SOURCE_REMOVE;
+        Gdk.Seat seat = display.get_default_seat ();
+        Gdk.Device mouse_device = seat.get_pointer ();
+        Gdk.Window group = display.get_default_group ();
+        int x, y;
+        group.get_device_position (mouse_device, out x, out y, null);
+        
+        int left, top, width, height;
+        main_window.get_position (out left, out top);
+        main_window.get_size (out width, out height);
+
+        // is cursor inside the main window?
+        int right = left + width;
+        int bottom = top + height;
+        if (x >= left && x < right && y >= top && y < bottom)
+            return true;
+
+        main_window.move(x + follow_dx, y + follow_dy);
+        return true;
     }
 
     /**
