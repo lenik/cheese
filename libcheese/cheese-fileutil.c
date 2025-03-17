@@ -74,6 +74,24 @@ cheese_fileutil_get_video_path (CheeseFileUtil *fileutil)
 }
 
 /**
+ * cheese_fileutil_get_video_path:
+ * @fileutil: a #CheeseFileUtil
+ *
+ * Set the path where Cheese video files are stored.
+ */
+void
+cheese_fileutil_set_video_path (CheeseFileUtil *fileutil, const gchar *path)
+{
+    CheeseFileUtilPrivate *priv;
+
+  g_return_if_fail (CHEESE_IS_FILEUTIL (fileutil));
+
+    priv = cheese_fileutil_get_instance_private (fileutil);
+
+    priv->video_path = g_strdup(path);
+}
+
+/**
  * cheese_fileutil_get_photo_path:
  * @fileutil: a #CheeseFileUtil
  *
@@ -91,6 +109,24 @@ cheese_fileutil_get_photo_path (CheeseFileUtil *fileutil)
     priv = cheese_fileutil_get_instance_private (fileutil);
 
     return priv->photo_path;
+}
+
+/**
+ * cheese_fileutil_set_photo_path:
+ * @fileutil: a #CheeseFileUtil
+ *
+ * Set the path where Cheese photo files are stored.
+ */
+void
+cheese_fileutil_set_photo_path (CheeseFileUtil *fileutil, const gchar *path)
+{
+    CheeseFileUtilPrivate *priv;
+
+    g_return_if_fail (CHEESE_IS_FILEUTIL (fileutil));
+
+    priv = cheese_fileutil_get_instance_private (fileutil);
+
+    priv->photo_path = g_strdup(path);
 }
 
 /*
