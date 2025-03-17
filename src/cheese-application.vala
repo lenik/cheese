@@ -59,15 +59,18 @@ public class Cheese.Application : Gtk.Application
 
     private static int init_width = 0;
     private static int init_height = 0;
-    private static int follow_interval = 1000;
+    private static int follow_interval = 0;
     private static int follow_dx = 10;
     private static int follow_dy = 10;
 
     private static string save_dir;
-    private static int shoot_interval = 1000;
+    private static int shoot_interval = 0;
     private static string auto_shoot_flash = "none";
     private static bool auto_shoot_sound = false;
-    
+
+    private static const int DEFAULT_FOLLOW_INTERVAL = 1000;
+    private static const int DEFAULT_SHOOT_INTERVAL = 1000;
+
     const OptionEntry[] options = {
         { "wide", 'w', 0, OptionArg.NONE, null, N_("Start in wide mode"),
           null  },
@@ -249,8 +252,21 @@ public class Cheese.Application : Gtk.Application
             main_window.resize(width, height);
         }
 
-        bool auto_following = opts.contains ("follow") || opts.contains ("follow-interval");
-        bool auto_shoot = opts.contains ("auto") || opts.contains ("shoot-interval");
+        bool auto_following = opts.contains ("follow");
+        bool auto_shoot = opts.contains ("auto") || shoot_interval != 0;
+        
+        if (follow_interval != 0) {
+            auto_following = true;
+        } else {
+            follow_interval = DEFAULT_FOLLOW_INTERVAL;
+        }
+
+        if (shoot_interval != 0) {
+            auto_shoot = true;
+        } else {
+            shoot_interval = DEFAULT_SHOOT_INTERVAL;
+        }
+
         setup_timers(auto_following, auto_shoot);
 
         return 0;
