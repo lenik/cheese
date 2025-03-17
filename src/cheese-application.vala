@@ -267,6 +267,13 @@ public class Cheese.Application : Gtk.Application
             shoot_interval = DEFAULT_SHOOT_INTERVAL;
         }
 
+        if (auto_shoot) {
+            if (save_dir != null) {
+                File dir = File.new_for_commandline_arg(save_dir);
+                dir.make_directory_with_parents();
+            }
+        }
+
         setup_timers(auto_following, auto_shoot);
 
         return 0;
