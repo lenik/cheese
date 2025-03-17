@@ -896,6 +896,33 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         return false;
     }
 
+    public void take_photo_background (string file_name) {
+        this.camera.take_photo (file_name);
+    }
+
+    public void fire_flash (bool always, bool never) {
+        if (! never)
+        {
+            bool enabled = always;
+            if (! always)
+            {
+                enabled = settings.get_boolean ("flash");
+            }
+            if (enabled)
+            {
+                flash.fire ();
+            }
+        }
+    }
+
+    public void play_shutter_sound () {
+        CanberraGtk.play_for_widget (this.main_vbox, 0,
+            Canberra.PROP_EVENT_ID, "camera-shutter",
+            Canberra.PROP_MEDIA_ROLE, "event",
+            Canberra.PROP_EVENT_DESCRIPTION, _("Shutter sound"),
+            null);
+    }
+
   /**
    * Cancel the current activity if the escape key is pressed.
    *
