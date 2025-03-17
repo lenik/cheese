@@ -38,6 +38,8 @@ public class Cheese.Application : Gtk.Application
 
     private Gtk.ShortcutsWindow shortcuts_window;
 
+    private Cheese.FileUtil fileutil_auto_shoot;
+
     private const GLib.ActionEntry action_entries[] = {
         { "shoot", on_shoot },
         { "mode", on_action_radio, "s", "'photo'", on_mode_change },
@@ -61,6 +63,11 @@ public class Cheese.Application : Gtk.Application
     private static int follow_dx = 10;
     private static int follow_dy = 10;
 
+    private static string save_dir;
+    private static int shoot_interval = 1000;
+    private static string auto_shoot_flash = "none";
+    private static bool auto_shoot_sound = false;
+    
     const OptionEntry[] options = {
         { "wide", 'w', 0, OptionArg.NONE, null, N_("Start in wide mode"),
           null  },
@@ -84,12 +91,18 @@ public class Cheese.Application : Gtk.Application
           N_("Specify the window height in pixels"), N_("HEIGHT") },
         { "follow", 'c', 0, OptionArg.NONE, null,
           N_("Make the window position follow the cursor on the screen"), null },
-        { "follow-interval", 0, 0, OptionArg.INT, ref follow_interval,
-          N_("Adjust the responsiveness of cursor following in ms, default 1000"), N_("INTERVAL") },
+        { "follow-interval", 'C', 0, OptionArg.INT, ref follow_interval,
+          N_("Adjust the responsiveness of cursor following by refreshing interval, implied --follow. default 1000 (ms)"), N_("INTERVAL") },
         { "follow-dx", 'x', 0, OptionArg.INT, ref follow_dx,
           N_("Specify the x-offset of the top-left of the window to the cursor"), N_("PIXELS") },
         { "follow-dy", 'y', 0, OptionArg.INT, ref follow_dy,
           N_("Specify the y-offset of the top-left of the window to the cursor"), N_("PIXELS") },
+        { "auto", 'a', 0, OptionArg.NONE, null,
+          N_("Start up to auto take photos repeatedly with the current user settings"), null },
+        { "save-dir", 'o', 0, OptionArg.STRING, ref save_dir,
+          N_("Where to save the captured photos"), N_("PATH") },
+        { "shoot-interval", 'i', 0, OptionArg.INT, ref shoot_interval,
+          N_("Specify the shoot interval (implied --auto), default 1000 (ms)"), N_("INTERVAL") },
         { null }
     };
 
@@ -163,6 +176,10 @@ public class Cheese.Application : Gtk.Application
             var preferences = this.lookup_action ("preferences");
             preferences.notify["enabled"].connect (on_preferences_enabled);
             this.add_window (main_window);
+
+            fileutil_auto_shoot = new FileUtil ();
+            if (save_dir != null)
+                fileutil_auto_shoot.set_photo_path(save_dir);
         }
     }
 
@@ -232,10 +249,10 @@ public class Cheese.Application : Gtk.Application
             main_window.resize(width, height);
         }
 
-        if (opts.contains ("follow"))
-        {
-            setup_timers();
-        }
+        bool auto_following = opts.contains ("follow") || opts.contains ("follow-interval");
+        bool auto_shoot = opts.contains ("auto") || opts.contains ("shoot-interval");
+        setup_timers(auto_following, auto_shoot);
+
         return 0;
     }
 
@@ -251,8 +268,16 @@ public class Cheese.Application : Gtk.Application
         return -1;
     }
 
-    private void setup_timers() {
-        GLib.Timeout.add (follow_interval, follow_the_mouse);
+    private void setup_timers(bool auto_following, bool auto_shoot) {
+        if (auto_following)
+        {
+            GLib.Timeout.add (follow_interval, follow_the_mouse);
+        }
+
+        if (auto_shoot)
+        {
+            GLib.Timeout.add (shoot_interval, on_auto_shoot);
+        }
     }
 
     private bool follow_the_mouse() {
@@ -276,6 +301,22 @@ public class Cheese.Application : Gtk.Application
             return true;
 
         main_window.move(x + follow_dx, y + follow_dy);
+        return true;
+    }
+
+    private bool on_auto_shoot () {
+        string file_name = fileutil_auto_shoot.get_new_media_filename (MediaMode.PHOTO);
+
+        main_window.fire_flash (auto_shoot_flash == "true",
+                                auto_shoot_flash == "false");
+
+        if (auto_shoot_sound)
+        {
+            main_window.play_shutter_sound ();
+        }
+
+        main_window.take_photo_background (file_name);
+
         return true;
     }
 
