@@ -55,6 +55,8 @@ public class Cheese.Application : Gtk.Application
         { "quit", on_quit }
     };
 
+    private static int init_width = 0;
+    private static int init_height = 0;
     private static int follow_interval = 1000;
     private static int follow_dx = 10;
     private static int follow_dy = 10;
@@ -76,6 +78,10 @@ public class Cheese.Application : Gtk.Application
           N_("Start with thumbnails view toggled off"), null },
         { "topmost", 't', 0, OptionArg.NONE, null,
           N_("Keep the main window above"), null },
+        { "width", 'W', 0, OptionArg.INT, ref init_width,
+          N_("Specify the window width in pixels"), N_("WIDTH") },
+        { "height", 'H', 0, OptionArg.INT, ref init_height,
+          N_("Specify the window height in pixels"), N_("HEIGHT") },
         { "follow", 'c', 0, OptionArg.NONE, null,
           N_("Make the window position follow the cursor on the screen"), null },
         { "follow-interval", 0, 0, OptionArg.INT, ref follow_interval,
@@ -214,6 +220,16 @@ public class Cheese.Application : Gtk.Application
         if (opts.contains ("topmost"))
         {
             main_window.set_keep_above(true);
+        }
+
+        if (init_width != 0 || init_height != 0) {
+            int width, height;
+            main_window.get_size(out width, out height);
+            if (init_width != 0)
+                width = init_width;
+            if (init_height != 0)
+                height = init_height;
+            main_window.resize(width, height);
         }
 
         if (opts.contains ("follow"))
