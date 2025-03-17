@@ -74,7 +74,9 @@ G_DECLARE_FINAL_TYPE (CheeseFileUtil, cheese_fileutil, CHEESE, FILEUTIL, GObject
 
 CheeseFileUtil *cheese_fileutil_new (void);
 const gchar *cheese_fileutil_get_video_path (CheeseFileUtil *fileutil);
+void         cheese_fileutil_set_video_path (CheeseFileUtil *fileutil, const gchar *path);
 const gchar *cheese_fileutil_get_photo_path (CheeseFileUtil *fileutil);
+void         cheese_fileutil_set_photo_path (CheeseFileUtil *fileutil, const gchar *path);
 gchar       *cheese_fileutil_get_new_media_filename (CheeseFileUtil *fileutil, CheeseMediaMode mode);
 void         cheese_fileutil_reset_burst (CheeseFileUtil *fileutil);
 

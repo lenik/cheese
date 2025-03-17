@@ -108,8 +108,12 @@ namespace Cheese
     public string get_new_media_filename (Cheese.MediaMode mode);
     [CCode (cname = "cheese_fileutil_get_photo_path")]
     public unowned string get_photo_path ();
+    [CCode (cname = "cheese_fileutil_set_photo_path")]
+    public unowned string set_photo_path (string path);
     [CCode (cname = "cheese_fileutil_get_video_path")]
     public unowned string get_video_path ();
+    [CCode (cname = "cheese_fileutil_set_video_path")]
+    public unowned string set_video_path (string path);
     [CCode (cname = "cheese_fileutil_reset_burst")]
     public void reset_burst ();
   }
