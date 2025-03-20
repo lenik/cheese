@@ -269,8 +269,15 @@ public class Cheese.Application : Gtk.Application
 
         if (auto_shoot) {
             if (save_dir != null) {
-                File dir = File.new_for_commandline_arg(save_dir);
-                dir.make_directory_with_parents();
+                File dir = File.new_for_commandline_arg (save_dir);
+                if (! dir.query_exists ()) {
+                    try {
+                        dir.make_directory_with_parents ();
+                    } catch (Error e) {
+                        error ("Error create directory %s: %s", save_dir, e.message);
+                        auto_shoot = false;
+                    }
+                }
             }
         }
 
