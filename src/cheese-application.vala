@@ -330,7 +330,21 @@ public class Cheese.Application : Gtk.Application
         if (x >= left && x < right && y >= top && y < bottom)
             return true;
 
-        main_window.move(x + follow_dx, y + follow_dy);
+        // restrict the window with-in the current monitor
+        Gdk.Monitor monitor = display.get_monitor_at_point(x, y);
+        Gdk.Rectangle monitor_geom = monitor.get_geometry();
+
+        int new_x = x + follow_dx;
+        int new_y = y + follow_dy;
+        
+        if (new_x + width >= monitor_geom.x + monitor_geom.width && x - follow_dx - width >= monitor_geom.x) {
+            new_x = x - follow_dx - width;
+        }
+        if (new_y + height >= monitor_geom.y + monitor_geom.height && y - follow_dy - height >= monitor_geom.y) {
+            new_y = y - follow_dy - height;
+        }
+        main_window.move(new_x, new_y);
+
         return true;
     }
 
