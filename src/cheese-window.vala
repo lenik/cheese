@@ -1672,9 +1672,20 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             int new_width = button_down_width + dx;
             int new_height = button_down_height + dy;
 
+            const int min_width = 64;
+            const int min_height = 36;
+
+            if (new_width < min_width) {
+                new_width = min_width;
+            }
+            if (new_height < min_height) {
+                new_height = min_height;
+            }
+
             // resize only when necessary
-            if (width != new_width || height != new_height)
+            if (width != new_width || height != new_height) {
                 resize (new_width, new_height);
+            }
         }
         return true;
     }
