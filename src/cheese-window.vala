@@ -1461,6 +1461,10 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         application.set_accels_for_action ("app.borderless", {"F4"});
         application.set_accels_for_action ("app.actionbar", {"F5"});
         application.set_accels_for_action ("app.thumbnails", {"F6"});
+        application.set_accels_for_action ("app.follow-toggle", {"grave"});
+        application.set_accels_for_action ("app.follow-faster", {"greater"});
+        application.set_accels_for_action ("app.follow-slower", {"less"});
+        application.set_accels_for_action ("app.follow-reset", {"equal"});
         application.set_accels_for_action ("win.file-open", {"<Primary>o"});
         application.set_accels_for_action ("win.file-saveas", {"<Primary>s"});
         application.set_accels_for_action ("win.file-trash", {"Delete"});

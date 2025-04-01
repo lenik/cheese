@@ -45,31 +45,48 @@ public class Cheese.Application : Gtk.Application
         { "mode", on_action_radio, "s", "'photo'", on_mode_change },
         { "fullscreen", on_action_toggle, null, "false",
           on_fullscreen_change },
-        { "borderless", on_action_toggle, null, "false", on_borderless_change },
-        { "actionbar", on_action_toggle, null, "true", on_actionbar_change },
-        { "thumbnails", on_action_toggle, null, "true", on_thumbnailsbar_change },
         { "wide-mode", on_action_toggle, null, "false", on_wide_mode_change },
         { "effects", on_action_toggle, null, "false", on_effects_change },
         { "preferences", on_preferences },
         { "shortcuts", on_shortcuts },
         { "help", on_help },
         { "about", on_about },
-        { "quit", on_quit }
+        { "quit", on_quit },
+
+        // mini-UI
+        { "borderless", on_action_toggle, null, "false", on_borderless_change },
+        { "actionbar", on_action_toggle, null, "true", on_actionbar_change },
+        { "thumbnails", on_action_toggle, null, "true", on_thumbnailsbar_change },
+        
+        // auto follow the cursor
+        { "follow-toggle", on_follow_toggle, null, "true", on_follow_toggle },
+        { "follow-faster", on_follow_faster, null, null, on_follow_faster },
+        { "follow-slower", on_follow_slower, null, null, on_follow_slower },
+        { "follow-reset", on_follow_reset, null, null, on_follow_reset },
     };
 
     private static int init_width = 0;
     private static int init_height = 0;
-    private static int follow_interval = 0;
-    private static int follow_dx = 10;
-    private static int follow_dy = 10;
+    private static int auto_follow_interval = 0;
+    private static int auto_follow_dx = 10;
+    private static int auto_follow_dy = 10;
 
-    private static string save_dir;
-    private static int shoot_interval = 0;
+    private static string auto_shoot_save_dir;
+    private static int auto_shoot_interval = 0;
     private static string auto_shoot_flash = "none";
     private static bool auto_shoot_sound = false;
 
     private static const int DEFAULT_FOLLOW_INTERVAL = 1000;
     private static const int DEFAULT_SHOOT_INTERVAL = 1000;
+
+    private bool auto_follow_enabled;
+    private uint auto_follow_id;
+    private double auto_follow_speed = 1.0;
+    private bool auto_follow_restart;
+    
+    private bool auto_shoot_enabled;
+    private uint auto_shoot_id;
+    private bool auto_shoot_restart;
 
     const OptionEntry[] options = {
         { "wide", 'w', 0, OptionArg.NONE, null, N_("Start in wide mode"),
@@ -94,17 +111,17 @@ public class Cheese.Application : Gtk.Application
           N_("Specify the window height in pixels"), N_("HEIGHT") },
         { "follow", 'c', 0, OptionArg.NONE, null,
           N_("Make the window position follow the cursor on the screen"), null },
-        { "follow-interval", 'C', 0, OptionArg.INT, ref follow_interval,
+        { "follow-interval", 'C', 0, OptionArg.INT, ref auto_follow_interval,
           N_("Adjust the responsiveness of cursor following by refreshing interval, implied --follow. default 1000 (ms)"), N_("INTERVAL") },
-        { "follow-dx", 'x', 0, OptionArg.INT, ref follow_dx,
+        { "follow-dx", 'x', 0, OptionArg.INT, ref auto_follow_dx,
           N_("Specify the x-offset of the top-left of the window to the cursor"), N_("PIXELS") },
-        { "follow-dy", 'y', 0, OptionArg.INT, ref follow_dy,
+        { "follow-dy", 'y', 0, OptionArg.INT, ref auto_follow_dy,
           N_("Specify the y-offset of the top-left of the window to the cursor"), N_("PIXELS") },
         { "auto", 'a', 0, OptionArg.NONE, null,
           N_("Start up to auto take photos repeatedly with the current user settings"), null },
-        { "save-dir", 'o', 0, OptionArg.STRING, ref save_dir,
+        { "save-dir", 'o', 0, OptionArg.STRING, ref auto_shoot_save_dir,
           N_("Where to save the captured photos"), N_("PATH") },
-        { "shoot-interval", 'i', 0, OptionArg.INT, ref shoot_interval,
+        { "shoot-interval", 'i', 0, OptionArg.INT, ref auto_shoot_interval,
           N_("Specify the shoot interval (implied --auto), default 1000 (ms)"), N_("INTERVAL") },
         { null }
     };
@@ -181,8 +198,8 @@ public class Cheese.Application : Gtk.Application
             this.add_window (main_window);
 
             fileutil_auto_shoot = new FileUtil ();
-            if (save_dir != null)
-                fileutil_auto_shoot.set_photo_path(save_dir);
+            if (auto_shoot_save_dir != null)
+                fileutil_auto_shoot.set_photo_path(auto_shoot_save_dir);
         }
     }
 
@@ -252,36 +269,37 @@ public class Cheese.Application : Gtk.Application
             main_window.resize(width, height);
         }
 
-        bool auto_following = opts.contains ("follow");
-        bool auto_shoot = opts.contains ("auto") || shoot_interval != 0;
+        auto_follow_enabled = opts.contains ("follow");
+        auto_shoot_enabled = opts.contains ("auto") || auto_shoot_interval != 0;
         
-        if (follow_interval != 0) {
-            auto_following = true;
+        if (auto_follow_interval != 0) {
+            auto_follow_enabled = true;
         } else {
-            follow_interval = DEFAULT_FOLLOW_INTERVAL;
+            auto_follow_interval = DEFAULT_FOLLOW_INTERVAL;
         }
 
-        if (shoot_interval != 0) {
-            auto_shoot = true;
+        if (auto_shoot_interval != 0) {
+            auto_shoot_enabled = true;
         } else {
-            shoot_interval = DEFAULT_SHOOT_INTERVAL;
+            auto_shoot_interval = DEFAULT_SHOOT_INTERVAL;
         }
 
-        if (auto_shoot) {
-            if (save_dir != null) {
-                File dir = File.new_for_commandline_arg (save_dir);
+        if (auto_shoot_enabled) {
+            if (auto_shoot_save_dir != null) {
+                File dir = File.new_for_commandline_arg (auto_shoot_save_dir);
                 if (! dir.query_exists ()) {
                     try {
                         dir.make_directory_with_parents ();
                     } catch (Error e) {
-                        error ("Error create directory %s: %s", save_dir, e.message);
-                        auto_shoot = false;
+                        error ("Error create directory %s: %s", auto_shoot_save_dir, e.message);
+                        auto_shoot_enabled = false;
                     }
                 }
             }
         }
 
-        setup_timers(auto_following, auto_shoot);
+        setup_auto_follow ();
+        setup_auto_shoot ();
 
         return 0;
     }
@@ -298,19 +316,35 @@ public class Cheese.Application : Gtk.Application
         return -1;
     }
 
-    private void setup_timers(bool auto_following, bool auto_shoot) {
-        if (auto_following)
+    private void setup_auto_follow () {
+        if (auto_follow_enabled)
         {
-            GLib.Timeout.add (follow_interval, follow_the_mouse);
-        }
-
-        if (auto_shoot)
-        {
-            GLib.Timeout.add (shoot_interval, on_auto_shoot);
+            int interval = (int) (auto_follow_interval / auto_follow_speed);
+            auto_follow_id = GLib.Timeout.add (interval, follow_the_mouse);
         }
     }
 
-    private bool follow_the_mouse() {
+    private void setup_auto_shoot () {
+        if (auto_shoot_enabled)
+        {
+            auto_shoot_id = GLib.Timeout.add (auto_shoot_interval, on_auto_shoot);
+        }
+    }
+
+    private bool follow_the_mouse () {
+        if (! auto_follow_enabled)
+        {
+            // cancel the timeout
+            return false;
+        }
+
+        if (auto_follow_restart)
+        {
+            auto_follow_restart = false;
+            setup_auto_follow ();
+            return false;
+        }
+
         Gdk.Display display = Gdk.Display.get_default ();
         if (display == null)
             return false; // G_SOURCE_REMOVE;
@@ -334,14 +368,14 @@ public class Cheese.Application : Gtk.Application
         Gdk.Monitor monitor = display.get_monitor_at_point(x, y);
         Gdk.Rectangle monitor_geom = monitor.get_geometry();
 
-        int new_x = x + follow_dx;
-        int new_y = y + follow_dy;
+        int new_x = x + auto_follow_dx;
+        int new_y = y + auto_follow_dy;
         
-        if (new_x + width >= monitor_geom.x + monitor_geom.width && x - follow_dx - width >= monitor_geom.x) {
-            new_x = x - follow_dx - width;
+        if (new_x + width >= monitor_geom.x + monitor_geom.width && x - auto_follow_dx - width >= monitor_geom.x) {
+            new_x = x - auto_follow_dx - width;
         }
-        if (new_y + height >= monitor_geom.y + monitor_geom.height && y - follow_dy - height >= monitor_geom.y) {
-            new_y = y - follow_dy - height;
+        if (new_y + height >= monitor_geom.y + monitor_geom.height && y - auto_follow_dy - height >= monitor_geom.y) {
+            new_y = y - auto_follow_dy - height;
         }
         main_window.move(new_x, new_y);
 
@@ -349,6 +383,12 @@ public class Cheese.Application : Gtk.Application
     }
 
     private bool on_auto_shoot () {
+        if (! auto_shoot_enabled)
+        {
+            // cancel the timeout
+            return false;
+        }
+
         string file_name = fileutil_auto_shoot.get_new_media_filename (MediaMode.PHOTO);
 
         main_window.fire_flash (auto_shoot_flash == "true",
@@ -640,6 +680,36 @@ public class Cheese.Application : Gtk.Application
          action.set_state (value);
      }
  
+     private void on_follow_toggle (SimpleAction action, Variant? value)
+     {
+        auto_follow_enabled = ! auto_follow_enabled;
+        setup_auto_follow ();
+     }
+
+     private void on_follow_faster (SimpleAction action, Variant? value)
+     {
+        if (auto_follow_speed < 10.0)
+        {
+            auto_follow_speed = auto_follow_speed * 1.25;
+        }
+        auto_follow_restart = true;
+     }
+
+     private void on_follow_slower (SimpleAction action, Variant? value)
+     {
+        if (auto_follow_speed > 0.1)
+        {
+            auto_follow_speed = auto_follow_speed / 1.25;
+        }
+        auto_follow_restart = true;
+     }
+
+     private void on_follow_reset (SimpleAction action, Variant? value)
+     {
+        auto_follow_speed = 1.0;
+        auto_follow_restart = true;
+     }
+
     /**
      * Handle the wide-mode state being changed.
      *
