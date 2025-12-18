@@ -116,6 +116,9 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
   private double button_down_y;
   private int button_down_width;
   private int button_down_height;
+  private int button_down_left;
+  private int button_down_top;
+  private int resize_edge; // 0=move, 1=top-left, 2=top-right, 3=bottom-left, 4=bottom-right (corners only)
 
   /**
    * Responses from the delete files confirmation dialog.
@@ -649,6 +652,15 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             this.button_release_event.connect (on_button_release);
             this.motion_notify_event.connect (on_motion_notify);
             this.key_press_event.connect (on_key_press);
+            
+            // Patch window size on startup to remove gaps (if camera is already set)
+            if (camera != null) {
+                // Use idle callback to ensure layout is complete
+                GLib.Idle.add (() => {
+                    patch_window_size_for_preview ();
+                    return false; // Don't repeat
+                });
+            }
          }
          else
          {
@@ -1616,6 +1628,15 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     {
         this.camera = camera;
         set_switch_camera_button_state ();
+        
+        // If in borderless mode, patch window size on startup to remove gaps
+        if (is_borderless) {
+            // Use idle callback to ensure layout is complete
+            GLib.Idle.add (() => {
+                patch_window_size_for_preview ();
+                return false; // Don't repeat
+            });
+        }
      }
 
     private bool on_button_press (Gtk.Widget widget,
@@ -1627,10 +1648,42 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         switch (event.button) {
             case 1:
                 button_move_or_resize = true;
+                resize_edge = 0; // move
                 break;
             case 3:
                 button_move_or_resize = false;
                 get_size (out button_down_width, out button_down_height);
+                get_position (out button_down_left, out button_down_top);
+                
+                // Detect which corner/edge we're resizing from
+                int width, height;
+                get_size (out width, out height);
+                
+                double mouse_x = event.x;
+                double mouse_y = event.y;
+                
+                // Calculate relative position (0.0 to 1.0)
+                double rel_x = mouse_x / width;
+                double rel_y = mouse_y / height;
+                
+                // Always use corner detection - no edge detection
+                // Use relative position to determine which corner
+                
+                // Determine corner based on relative position
+                // Split window into 4 quadrants
+                if (rel_x < 0.5 && rel_y < 0.5) {
+                    // Top-left quadrant
+                    resize_edge = 1; // top-left
+                } else if (rel_x >= 0.5 && rel_y < 0.5) {
+                    // Top-right quadrant
+                    resize_edge = 2; // top-right
+                } else if (rel_x < 0.5 && rel_y >= 0.5) {
+                    // Bottom-left quadrant
+                    resize_edge = 3; // bottom-left
+                } else {
+                    // Bottom-right quadrant (rel_x >= 0.5 && rel_y >= 0.5)
+                    resize_edge = 4; // bottom-right
+                }
                 break;
             default:
                 return false;
@@ -1647,12 +1700,170 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     {
         if (button_down) {
             button_down = false;
+            
+            // If we were resizing (not moving), patch the window size to remove gaps
+            if (!button_move_or_resize && resize_edge != 0) {
+                patch_window_size_for_preview ();
+            }
+            
             return true;
         } else {
             return false;
         }
     }
-
+    
+    /**
+     * Adjust window size after resize to remove gaps around preview frame
+     */
+    private void patch_window_size_for_preview ()
+    {
+        // Get current window size
+        int current_width, current_height;
+        get_size (out current_width, out current_height);
+        int current_left, current_top;
+        get_position (out current_left, out current_top);
+        
+        // Get camera format aspect ratio as reference
+        double camera_aspect_ratio = 16.0 / 9.0; // default
+        int camera_format_width = 0;
+        int camera_format_height = 0;
+        
+        if (camera != null) {
+            unowned Cheese.VideoFormat format = camera.get_current_video_format ();
+            if (format != null && format.height > 0) {
+                camera_format_width = format.width;
+                camera_format_height = format.height;
+                camera_aspect_ratio = (double)format.width / (double)format.height;
+            }
+        }
+        
+        // Get the actual viewport/preview area size (where content is displayed)
+        int viewport_available_width = 0;
+        int viewport_available_height = 0;
+        
+        if (viewport_widget != null) {
+            Gtk.Allocation alloc;
+            viewport_widget.get_allocation (out alloc);
+            viewport_available_width = alloc.width;
+            viewport_available_height = alloc.height;
+        }
+        
+        // Calculate the actual content size that fits in the viewport while maintaining camera aspect ratio
+        // This is the largest rectangle with camera_aspect_ratio that fits in viewport_available_width x viewport_available_height
+        int preview_width = 0;
+        int preview_height = 0;
+        double aspect_ratio = camera_aspect_ratio;
+        
+        if (viewport_available_width > 0 && viewport_available_height > 0) {
+            // Calculate what the content size would be if we fit it to the viewport
+            double viewport_aspect = (double)viewport_available_width / (double)viewport_available_height;
+            
+            if (viewport_aspect > camera_aspect_ratio) {
+                // Viewport is wider - height is the limiting factor
+                preview_height = viewport_available_height;
+                preview_width = (int)(preview_height * camera_aspect_ratio);
+            } else {
+                // Viewport is taller - width is the limiting factor
+                preview_width = viewport_available_width;
+                preview_height = (int)(preview_width / camera_aspect_ratio);
+            }
+        } else {
+            // Fallback: use camera format size directly if viewport not available
+            preview_width = camera_format_width;
+            preview_height = camera_format_height;
+            aspect_ratio = camera_aspect_ratio;
+        }
+        
+        // Use the actual viewport allocation (accounts for any spacing automatically)
+        int viewport_current_width = viewport_available_width;
+        int viewport_current_height = viewport_available_height;
+        
+        if (viewport_current_width < 1) viewport_current_width = 1;
+        if (viewport_current_height < 1) viewport_current_height = 1;
+        
+        // Calculate ideal viewport size to match preview aspect ratio
+        // The preview_width/height already fit the viewport with correct aspect ratio
+        // So we use those directly as the target viewport size
+        int viewport_target_width = preview_width;
+        int viewport_target_height = preview_height;
+        
+        // Calculate target window size by adding back UI elements
+        // Get the actual allocations to account for any spacing
+        int actual_header_height = 0;
+        int actual_actionbar_height = 0;
+        int actual_thumbnails_width = 0;
+        int actual_thumbnails_height = 0;
+        
+        if (header_bar != null && header_bar.visible && !is_borderless) {
+            Gtk.Allocation header_alloc;
+            header_bar.get_allocation (out header_alloc);
+            actual_header_height = header_alloc.height;
+        }
+        
+        // Get actionbar height including parent container (accounts for spacing)
+        if (buttons_area != null && buttons_area.visible && is_actionbar_visible) {
+            Gtk.Allocation actionbar_alloc;
+            buttons_area.get_allocation (out actionbar_alloc);
+            actual_actionbar_height = actionbar_alloc.height;
+            
+            // Check parent container for spacing
+            Gtk.Widget? parent = buttons_area.get_parent ();
+            if (parent != null) {
+                Gtk.Allocation parent_alloc;
+                parent.get_allocation (out parent_alloc);
+                if (parent_alloc.height > actionbar_alloc.height) {
+                    actual_actionbar_height = parent_alloc.height;
+                }
+            }
+        }
+        
+        if (is_thumbnailsbar_visible && !is_fullscreen) {
+            if (is_wide_mode && thumbnails_right != null && thumbnails_right.visible) {
+                Gtk.Allocation thumb_alloc;
+                thumbnails_right.get_allocation (out thumb_alloc);
+                actual_thumbnails_width = thumb_alloc.width;
+            } else if (!is_wide_mode && thumbnails_bottom != null && thumbnails_bottom.visible) {
+                Gtk.Allocation thumb_alloc;
+                thumbnails_bottom.get_allocation (out thumb_alloc);
+                actual_thumbnails_height = thumb_alloc.height;
+            }
+        }
+        
+        // Calculate target window size
+        int target_width = viewport_target_width + actual_thumbnails_width;
+        int target_height = viewport_target_height + actual_header_height + actual_actionbar_height + actual_thumbnails_height;
+        
+        // Only resize if there's a significant difference (more than 2 pixels)
+        if ((target_width - current_width).abs () > 2 || (target_height - current_height).abs () > 2) {
+            // Calculate position adjustment to keep the resize corner fixed
+            int new_left = current_left;
+            int new_top = current_top;
+            
+            switch (resize_edge) {
+                case 1: // top-left
+                    new_left = current_left + (current_width - target_width);
+                    new_top = current_top + (current_height - target_height);
+                    break;
+                case 2: // top-right
+                    new_top = current_top + (current_height - target_height);
+                    break;
+                case 3: // bottom-left
+                    new_left = current_left + (current_width - target_width);
+                    break;
+                case 4: // bottom-right - no position change
+                    break;
+                default:
+                    // Should not happen
+                    break;
+            }
+            
+            if (new_left != current_left || new_top != current_top) {
+                move (new_left, new_top);
+            }
+            resize (target_width, target_height);
+        }
+    }
+    
     private bool on_motion_notify (Gtk.Widget widget,
                                    Gdk.EventMotion event)
     {
@@ -1670,26 +1881,73 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             int new_top = top + dy;
             move (new_left, new_top);
         } else {
-            int width, height;
-            get_size (out width, out height);
-            // Resizing the window
-            int new_width = button_down_width + dx;
-            int new_height = button_down_height + dy;
+            // Resizing the window - allow free resizing, patch on release
+            int mouse_width = button_down_width;
+            int mouse_height = button_down_height;
+            
+            // Calculate new size based on which corner is being resized (corners only)
+            switch (resize_edge) {
+                case 1: // top-left
+                    mouse_width = button_down_width - dx;
+                    mouse_height = button_down_height - dy;
+                    break;
+                case 2: // top-right
+                    mouse_width = button_down_width + dx;
+                    mouse_height = button_down_height - dy;
+                    break;
+                case 3: // bottom-left
+                    mouse_width = button_down_width - dx;
+                    mouse_height = button_down_height + dy;
+                    break;
+                case 4: // bottom-right
+                    mouse_width = button_down_width + dx;
+                    mouse_height = button_down_height + dy;
+                    break;
+                default:
+                    // Should not happen, but default to bottom-right
+                    mouse_width = button_down_width + dx;
+                    mouse_height = button_down_height + dy;
+                    break;
+            }
 
             const int min_width = 64;
             const int min_height = 36;
 
-            if (new_width < min_width) {
-                new_width = min_width;
-            }
-            if (new_height < min_height) {
-                new_height = min_height;
+            // Enforce minimum size
+            if (mouse_width < min_width) mouse_width = min_width;
+            if (mouse_height < min_height) mouse_height = min_height;
+
+            int new_left = button_down_left;
+            int new_top = button_down_top;
+
+            // Calculate position adjustment based on which corner is being resized
+            switch (resize_edge) {
+                case 1: // top-left
+                    new_left = button_down_left + (button_down_width - mouse_width);
+                    new_top = button_down_top + (button_down_height - mouse_height);
+                    break;
+                case 2: // top-right
+                    new_top = button_down_top + (button_down_height - mouse_height);
+                    break;
+                case 3: // bottom-left
+                    new_left = button_down_left + (button_down_width - mouse_width);
+                    break;
+                case 4: // bottom-right
+                    // No position change
+                    break;
+                default:
+                    // Should not happen
+                    break;
             }
 
-            // resize only when necessary
-            if (width != new_width || height != new_height) {
-                resize (new_width, new_height);
+            // Apply resize immediately (no aspect ratio patching during drag)
+            int current_left, current_top;
+            get_position (out current_left, out current_top);
+            
+            if (new_left != current_left || new_top != current_top) {
+                move (new_left, new_top);
             }
+            resize (mouse_width, mouse_height);
         }
         return true;
     }
