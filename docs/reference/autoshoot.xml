@@ -1,0 +1,183 @@
+<?xml version="1.0"?>
+<simplesect>
+<para>
+    Auto-shoot mode enables automatic photo capture at specified intervals, making
+    it ideal for time-lapse photography, surveillance applications, or any scenario
+    where continuous photo capture is needed without manual intervention.
+</para>
+
+<refsect1>
+    <title>Enabling Auto-Shoot</title>
+    <para>
+      To enable auto-shoot mode, use the <option>--auto</option> or
+      <option>-a</option> command-line option:
+    </para>
+    <screen>
+cheese --auto
+    </screen>
+    <para>
+      By default, photos are captured every 1000 milliseconds (1 second) and saved
+      to the default photo directory. You can customize both the interval and the
+      save location.
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>Configuring Shoot Interval</title>
+    <para>
+      Use the <option>--shoot-interval</option> or <option>-i</option> option to
+      specify the interval between photos in milliseconds:
+    </para>
+    <screen>
+cheese --auto --shoot-interval 5000
+    </screen>
+    <para>
+      This example captures a photo every 5 seconds. The interval can be set to
+      any positive value, allowing for very rapid capture (e.g., 100ms for 10
+      photos per second) or slow time-lapse (e.g., 60000ms for 1 photo per minute).
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>Specifying Save Directory</title>
+    <para>
+      Use the <option>--save-dir</option> or <option>-o</option> option to specify
+      a custom directory for saving captured photos:
+    </para>
+    <screen>
+cheese --auto --save-dir /path/to/photos
+    </screen>
+    <para>
+      If the specified directory does not exist, Cheese will automatically create
+      it along with any necessary parent directories. If directory creation fails,
+      an error will be displayed and auto-shoot will not start.
+    </para>
+    <para>
+      Example: Capture photos every 2 seconds and save them to a custom directory:
+    </para>
+    <screen>
+cheese --auto --shoot-interval 2000 --save-dir ~/timelapse/2025-04
+    </screen>
+  </refsect1>
+
+  <refsect1>
+    <title>Flash and Sound Settings</title>
+    <para>
+      Auto-shoot mode respects your current Cheese settings for flash and sound:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          If flash is enabled in preferences, it will fire for each captured photo
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          If shutter sound is enabled, it will play for each captured photo
+        </para>
+      </listitem>
+    </itemizedlist>
+    <para>
+      These settings can be configured through Cheese's preferences dialog before
+      starting auto-shoot mode.
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>File Naming</title>
+    <para>
+      Photos captured in auto-shoot mode follow the same naming convention as
+      manually captured photos. Each photo is given a unique filename based on
+      the current date and time, ensuring no files are overwritten.
+    </para>
+    <para>
+      The filename format typically includes:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>Date and time stamp</para>
+      </listitem>
+      <listitem>
+        <para>Sequential number for photos taken in the same second</para>
+      </listitem>
+      <listitem>
+        <para>Appropriate file extension (e.g., .jpg, .png)</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Stopping Auto-Shoot</title>
+    <para>
+      To stop auto-shoot mode, simply close the Cheese window or quit the
+      application. There is no separate command to stop auto-shoot while keeping
+      Cheese running.
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>Use Cases</title>
+    <para>
+      Auto-shoot mode is useful for various scenarios:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          <emphasis>Time-lapse photography</emphasis>: Capture photos at regular
+          intervals to create time-lapse videos
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <emphasis>Security monitoring</emphasis>: Continuous photo capture for
+          surveillance purposes
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <emphasis>Documentation</emphasis>: Automatic capture of periodic events
+          or processes
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <emphasis>Scientific recording</emphasis>: Automated data collection at
+          regular intervals
+        </para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+
+  <refsect1>
+    <title>Combining with Other Features</title>
+    <para>
+      Auto-shoot mode can be combined with other Cheese features for enhanced
+      functionality:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          <option>--borderless</option>: Run in minimal borderless window while
+          capturing photos
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <option>--topmost</option>: Keep window on top to monitor capture status
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <option>--noactionbar</option>: Minimize UI for long-running captures
+        </para>
+      </listitem>
+    </itemizedlist>
+    <para>
+      Example: Run auto-shoot in a minimal borderless window, capturing every 3
+      seconds:
+    </para>
+    <screen>
+cheese --auto --shoot-interval 3000 --save-dir ~/captures --borderless --noactionbar
+      </screen>
+</refsect1>
+</simplesect>

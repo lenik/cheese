@@ -74,6 +74,16 @@
     <xi:include href="cheese.xml"/>
   </chapter>
 
+  <chapter id="borderless-mode">
+    <title>Borderless (Mini-UI) Mode</title>
+    <xi:include href="borderless.xml"/>
+  </chapter>
+
+  <chapter id="autoshoot-mode">
+    <title>Auto-Shoot Mode</title>
+    <xi:include href="autoshoot.xml"/>
+  </chapter>
+
   <chapter id="object-tree">
     <title>Object Hierarchy</title>
      <xi:include href="xml/tree_index.sgml"/>

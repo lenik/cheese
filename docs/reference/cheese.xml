@@ -63,6 +63,71 @@ Use the supplied DEVICE as the video capture device.
 </varlistentry>
 
 <varlistentry>
+<term><option>--borderless</option>, <option>-b</option></term>
+<listitem><para>Start in borderless mode (no window decorations). In borderless mode, left mouse button moves the window and right mouse button resizes from corners while preserving the camera's aspect ratio.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--noactionbar</option>, <option>-n</option></term>
+<listitem><para>Start with action bar (buttons) toggled off.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--nothumbnails</option>, <option>-m</option></term>
+<listitem><para>Start with thumbnails view toggled off.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--topmost</option>, <option>-t</option></term>
+<listitem><para>Keep the main window above other windows.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--width=WIDTH</option>, <option>-W WIDTH</option></term>
+<listitem><para>Specify the window width in pixels.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--height=HEIGHT</option>, <option>-H HEIGHT</option></term>
+<listitem><para>Specify the window height in pixels.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--follow</option>, <option>-c</option></term>
+<listitem><para>Make the window position follow the cursor on the screen. Useful for mini-UI mode where the window can be resized very small.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--follow-interval=INTERVAL</option>, <option>-C INTERVAL</option></term>
+<listitem><para>Adjust the responsiveness of cursor following by refresh interval in milliseconds. Implies <option>--follow</option>. Default is 1000ms.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--follow-dx=PIXELS</option>, <option>-x PIXELS</option></term>
+<listitem><para>X-offset of window top-left to cursor. Default is 10 pixels.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--follow-dy=PIXELS</option>, <option>-y PIXELS</option></term>
+<listitem><para>Y-offset of window top-left to cursor. Default is 10 pixels.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--auto</option>, <option>-a</option></term>
+<listitem><para>Enable auto-shoot mode. Automatically takes photos repeatedly at specified intervals.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--save-dir=PATH</option>, <option>-o PATH</option></term>
+<listitem><para>Specify directory to save captured photos. Automatically creates the directory with parent directories if they don't exist.</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><option>--shoot-interval=INTERVAL</option>, <option>-i INTERVAL</option></term>
+<listitem><para>Specify shoot interval in milliseconds for auto-shoot mode. Default is 1000ms.</para></listitem>
+</varlistentry>
+
+<varlistentry>
 <term><option>--help</option>, <option>-h</option></term>
 <listitem><para>Print brief help and exit.</para></listitem>
 </varlistentry>

@@ -1,4 +1,6 @@
 cheese_xml = files('cheese.xml')
+borderless_xml = files('borderless.xml')
+autoshoot_xml = files('autoshoot.xml')
 
 if enable_gtk_doc
   private_headers = [
@@ -37,7 +39,7 @@ if enable_gtk_doc
     scan_args: '--rebuild-types',
     fixxref_args: fixxref_args,
     html_assets: 'images/cheese_architecture.png',
-    content_files: cheese_xml + [version_xml],
+    content_files: cheese_xml + borderless_xml + autoshoot_xml + [version_xml],
     install: true,
   )
 endif

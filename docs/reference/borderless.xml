@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<simplesect>
+<para>
+    Borderless mode allows Cheese to run without window decorations, creating a
+    minimal UI perfect for always-visible webcam monitoring or integration into
+    custom workflows. In borderless mode, the window can be resized very small
+    (down to 64x36 pixels) and positioned anywhere on the screen.
+</para>
+
+<refsect1>
+    <title>Starting in Borderless Mode</title>
+    <para>
+      To start Cheese in borderless mode, use the <option>--borderless</option>
+      or <option>-b</option> command-line option:
+    </para>
+    <screen>
+cheese --borderless
+    </screen>
+    <para>
+      You can also toggle borderless mode at runtime using the <keycap>F4</keycap>
+      keyboard shortcut.
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>Window Controls</title>
+    <para>
+      In borderless mode, the window can be controlled using the mouse:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          <emphasis>Left mouse button</emphasis>: Click and drag to move the window
+          around the screen.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <emphasis>Right mouse button</emphasis>: Click and drag from any corner
+          to resize the window. The window will automatically maintain the camera's
+          aspect ratio to ensure the preview fills the available space without gaps.
+        </para>
+      </listitem>
+    </itemizedlist>
+    <para>
+      The window is divided into four quadrants for corner detection:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>Top-left quadrant: Resize from top-left corner</para>
+      </listitem>
+      <listitem>
+        <para>Top-right quadrant: Resize from top-right corner</para>
+      </listitem>
+      <listitem>
+        <para>Bottom-left quadrant: Resize from bottom-left corner</para>
+      </listitem>
+      <listitem>
+        <para>Bottom-right quadrant: Resize from bottom-right corner</para>
+      </listitem>
+    </itemizedlist>
+</refsect1>
+
+<refsect1>
+    <title>Aspect Ratio Preservation</title>
+    <para>
+      When resizing in borderless mode, Cheese automatically adjusts the window
+      size to maintain the camera's aspect ratio. This ensures that:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          The video preview fills the available viewport space without gaps
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The window size accounts for UI elements (header bar, action bar,
+          thumbnails) to provide accurate sizing
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The window is automatically patched on startup to remove any initial gaps
+        </para>
+      </listitem>
+    </itemizedlist>
+    <para>
+      The aspect ratio is calculated from the camera's current video format, ensuring
+      the preview always displays correctly regardless of the camera resolution.
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>Minimum Window Size</title>
+    <para>
+      The window has a minimum size of 64x36 pixels to ensure basic functionality
+      and visibility. Attempts to resize below this minimum will be automatically
+      constrained.
+    </para>
+  </refsect1>
+
+  <refsect1>
+    <title>Combining with Other Features</title>
+    <para>
+      Borderless mode works well when combined with other mini-UI features:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          <option>--noactionbar</option>: Hide the action bar for an even more
+          minimal interface
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <option>--nothumbnails</option>: Hide thumbnails to maximize preview space
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <option>--follow</option>: Make the window follow the cursor, perfect
+          for small overlay windows
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <option>--topmost</option>: Keep the window always on top for monitoring
+        </para>
+      </listitem>
+    </itemizedlist>
+    <para>
+      Example: Start Cheese in a minimal borderless window that follows the cursor:
+    </para>
+    <screen>
+cheese --borderless --noactionbar --nothumbnails --follow --topmost
+    </screen>
+  </refsect1>
+
+  <refsect1>
+    <title>Keyboard Shortcuts</title>
+    <para>
+      The following keyboard shortcuts are available in borderless mode:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          <keycap>F4</keycap>: Toggle borderless mode on/off
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <keycap>F5</keycap>: Toggle action bar visibility
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <keycap>F6</keycap>: Toggle thumbnails visibility
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <keycap>h</keycap>: Select Flip effect
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          <keycap>v</keycap>: Select Flip-Vertical effect
+        </para>
+      </listitem>
+    </itemizedlist>
+</refsect1>
+</simplesect>
