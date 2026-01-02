@@ -1495,6 +1495,10 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
         viewport = viewport_widget.get_stage () as Clutter.Stage;
 
+        // Enable alpha compositing on the Clutter stage to support transparency
+        // This is needed for opacity to work properly with video textures
+        viewport.set_use_alpha (true);
+
         video_preview = clutter_builder.get_object ("video_preview") as Clutter.Actor;
         viewport_layout = clutter_builder.get_object ("viewport_layout") as Clutter.Actor;
         viewport_layout_manager = clutter_builder.get_object ("viewport_layout_manager") as Clutter.BinLayout;
@@ -1539,6 +1543,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     /* needed for the sizing tricks in set_wide_mode (allocation is 0
      * if the widget is not realized */
     viewport_widget.realize ();
+
+    viewport_widget.scroll_event.connect (on_viewport_scroll);
 
     set_wide_mode (false);
 
@@ -1710,6 +1716,105 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         } else {
             return false;
         }
+    }
+
+    private string input_source_to_name (Gdk.InputSource source)
+    {
+        switch (source) {
+            case Gdk.InputSource.MOUSE:
+                return "MOUSE";
+            case Gdk.InputSource.PEN:
+                return "PEN";
+            case Gdk.InputSource.ERASER:
+                return "ERASER";
+            case Gdk.InputSource.CURSOR:
+                return "CURSOR";
+            case Gdk.InputSource.KEYBOARD:
+                return "KEYBOARD";
+            case Gdk.InputSource.TOUCHSCREEN:
+                return "TOUCHSCREEN";
+            case Gdk.InputSource.TOUCHPAD:
+                return "TOUCHPAD";
+            case Gdk.InputSource.TABLET_PAD:
+                return "TABLET_PAD";
+            default:
+                return "UNKNOWN(%d)".printf((int)source);
+        }
+    }
+
+    private bool on_viewport_scroll (Gtk.Widget widget,
+                                     Gdk.EventScroll event)
+    {
+        if (!is_borderless)
+            return false;
+
+        // Check the source device type to distinguish mouse wheel from trackpad
+        unowned Gdk.Device? source_device = event.get_source_device ();
+        
+        Gdk.InputSource source = Gdk.InputSource.MOUSE;
+        if (source_device != null) {
+            source = source_device.get_source ();
+        }
+        
+        double opacity_step = 0.05;
+        double current_opacity = this.opacity;
+        double new_opacity = current_opacity;
+        
+        switch (source) {
+            case Gdk.InputSource.TOUCHPAD:
+            case 7:
+                opacity_step = 0.01;
+                if (event.direction == Gdk.ScrollDirection.SMOOTH) {
+                    double _delta_x, delta_y;
+                    if (event.get_scroll_deltas (out _delta_x, out delta_y)) {
+                        // Use vertical delta (delta_y) for opacity change
+                        if (delta_y < 0)
+                            new_opacity = current_opacity - opacity_step;
+                        else
+                            new_opacity = current_opacity + opacity_step;
+                        break;
+                    }
+                }
+                return false;
+            default:
+                if (event.direction == Gdk.ScrollDirection.UP) {
+                    new_opacity = current_opacity - opacity_step;
+                    break;
+                } else if (event.direction == Gdk.ScrollDirection.DOWN) {
+                    new_opacity = current_opacity + opacity_step;
+                    break;
+                }
+                return false;
+        }
+
+        // Clamp opacity between 0.01 and 1.0
+        new_opacity = new_opacity.clamp (0.01, 1.0);
+        
+        // Apply opacity to window
+        this.opacity = new_opacity;
+        
+        // Also set opacity on Clutter actors so camera preview respects opacity
+        // Clutter uses 0-255 range, GTK window uses 0.0-1.0 range
+        uint8 clutter_opacity = (uint8)(new_opacity * 255.0);
+        
+        // GStreamer video textures ignore Clutter actor opacity, so we rely on window opacity
+        // Window opacity should make everything transparent, including Clutter content
+        // Set opacity on the Clutter stage to match window opacity (though it may not work for video)
+        if (viewport != null) {
+            viewport.opacity = clutter_opacity;
+        }
+        
+        // set background layer opacity
+        if (background_layer != null) {
+            background_layer.opacity = clutter_opacity;
+        }
+        
+        // Also set opacity on the video preview actor itself
+        if (video_preview != null) {
+            video_preview.opacity = clutter_opacity;
+        }
+        
+        return true;
     }
     
     /**
