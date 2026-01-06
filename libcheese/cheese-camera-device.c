@@ -27,6 +27,7 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 #include <gio/gio.h>
+#include <stdio.h>
 
 #include "cheese-camera-device.h"
 
@@ -631,10 +632,14 @@ cheese_camera_device_set_property (GObject *object, guint prop_id, const GValue 
       priv->device = g_value_dup_object (value);
       g_free (priv->name);
       priv->name = gst_device_get_display_name (priv->device);
-      tmp = gst_structure_get_value (gst_device_get_properties (priv->device), "api.v4l2.path");
-      if (tmp) {
-        g_clear_pointer (&priv->path, g_free);
-        priv->path = g_value_dup_string (tmp);
+
+      GstStructure *properties = gst_device_get_properties (priv->device);
+      if (properties != NULL) {
+        tmp = gst_structure_get_value (properties, "api.v4l2.path");
+        if (tmp) {
+          g_clear_pointer (&priv->path, g_free);
+          priv->path = g_value_dup_string (tmp);
+        }
       }
       break;
     case PROP_PATH:
