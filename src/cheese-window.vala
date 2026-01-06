@@ -2159,6 +2159,14 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             double default_hue = 0.0;
             double default_saturation = 1.0;
             double default_lux = 0.0;
+            double default_lux_black = 0.0;
+            double default_lux_shadow = 0.0;
+            double default_lux_midtone = 0.0;
+            double default_lux_highlight = 0.0;
+            double default_lux_white = 0.0;
+            double default_lux_orange = 0.0;
+            double default_lux_blur = 0.0;
+            double default_lux_sharpness = 0.0;
             double default_opacity = 1.0;
             
             // Apply to camera
@@ -2167,6 +2175,14 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             camera.set_balance_property ("hue", default_hue);
             camera.set_balance_property ("saturation", default_saturation);
             camera.set_lux (default_lux);
+            camera.set_lux_black (default_lux_black);
+            camera.set_lux_shadow (default_lux_shadow);
+            camera.set_lux_midtone (default_lux_midtone);
+            camera.set_lux_highlight (default_lux_highlight);
+            camera.set_lux_white (default_lux_white);
+            camera.set_lux_orange (default_lux_orange);
+            camera.set_lux_blur (default_lux_blur);
+            camera.set_lux_sharpness (default_lux_sharpness);
             
             // Save to settings
             settings.set_double ("brightness", default_brightness);
@@ -2174,6 +2190,14 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             settings.set_double ("hue", default_hue);
             settings.set_double ("saturation", default_saturation);
             settings.set_double ("lux", default_lux);
+            settings.set_double ("lux-black", default_lux_black);
+            settings.set_double ("lux-shadow", default_lux_shadow);
+            settings.set_double ("lux-midtone", default_lux_midtone);
+            settings.set_double ("lux-highlight", default_lux_highlight);
+            settings.set_double ("lux-white", default_lux_white);
+            settings.set_double ("lux-orange", default_lux_orange);
+            settings.set_double ("lux-blur", default_lux_blur);
+            settings.set_double ("lux-sharpness", default_lux_sharpness);
             
             // Reset opacity
             this.opacity = default_opacity;
@@ -2192,13 +2216,103 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             return true;
         }
         
-        switch (event.keyval) {
-        case 'h':
-            select_effect_by_name("Flip");
-            break;
-        case 'v':
-            select_effect_by_name("Flip Vertical");
-            break;
+        if (camera == null)
+            return false;
+        
+        bool shift_pressed = (event.state & Gdk.ModifierType.SHIFT_MASK) != 0;
+        uint keyval = event.keyval;
+        uint keyval_lower = Gdk.keyval_to_lower (event.keyval);
+        double step = 0.01;
+        double current_value;
+        double new_value;
+        
+        bool is_lux_key = true;
+
+        // Handle lux adjustment shortcuts
+        // Check for number keys and their shifted symbols
+        switch (keyval_lower) {
+            case '1': // black: 1+ increase, !- decrease
+            case '!':
+                current_value = settings.get_double ("lux-black");
+                new_value = (keyval == '1') ? current_value + step : current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_black (new_value);
+                settings.set_double ("lux-black", new_value);
+                break;
+            case '2': // shadow: 2+ increase, @- decrease
+            case '@':
+                current_value = settings.get_double ("lux-shadow");
+                new_value = (keyval == '2') ? current_value + step : current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_shadow (new_value);
+                settings.set_double ("lux-shadow", new_value);
+                break;
+            case '3': // midtone: 3+ increase, #- decrease
+            case '#':
+                current_value = settings.get_double ("lux-midtone");
+                new_value = (keyval == '3') ? current_value + step : current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_midtone (new_value);
+                settings.set_double ("lux-midtone", new_value);
+                break;
+            case '4': // highlight: 4+ increase, $- decrease
+            case '$':
+                current_value = settings.get_double ("lux-highlight");
+                new_value = (keyval == '4') ? current_value + step : current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_highlight (new_value);
+                settings.set_double ("lux-highlight", new_value);
+                break;
+            case '5': // white: 5+ increase, %- decrease
+            case '%':
+                current_value = settings.get_double ("lux-white");
+                new_value = (keyval == '5') ? current_value + step : current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_white (new_value);
+                settings.set_double ("lux-white", new_value);
+                break;
+            case 'y': // orange: y+ increase, Y- decrease
+                current_value = settings.get_double ("lux-orange");
+                new_value = shift_pressed ? current_value - step : current_value + step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_orange (new_value);
+                settings.set_double ("lux-orange", new_value);
+                break;
+            case 'b': // blur: b+ increase, B- decrease
+                current_value = settings.get_double ("lux-blur");
+                new_value = shift_pressed ? current_value - step : current_value + step;
+                new_value = new_value.clamp (-10.0, 10.0);
+                camera.set_lux_blur (new_value);
+                settings.set_double ("lux-blur", new_value);
+                break;
+            case 's': // sharpness: s+ increase, S- decrease
+                current_value = settings.get_double ("lux-sharpness");
+                new_value = shift_pressed ? current_value - step : current_value + step;
+                new_value = new_value.clamp (-10.0, 10.0);
+                camera.set_lux_sharpness (new_value);
+                settings.set_double ("lux-sharpness", new_value);
+                break;
+            case 'h':
+                select_effect_by_name("Flip");
+                return true;
+            case 'v':
+                select_effect_by_name("Flip Vertical");
+                return true;
+            default:
+                is_lux_key = false;
+                break;
+        }
+        if (is_lux_key) {
+            //  stdout.printf("black %.3f, shadow %.3f, midtone %.3f, highlight %.3f, white %.3f, orange %.3f, blur %.3f, sharpness %.3f\n",
+            //      settings.get_double ("lux-black"),
+            //      settings.get_double ("lux-shadow"),
+            //      settings.get_double ("lux-midtone"),
+            //      settings.get_double ("lux-highlight"),
+            //      settings.get_double ("lux-white"),
+            //      settings.get_double ("lux-orange"),
+            //      settings.get_double ("lux-blur"),
+            //      settings.get_double ("lux-sharpness"));
+            return true;
         }
         return false;
     }

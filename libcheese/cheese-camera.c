@@ -1855,6 +1855,7 @@ void
 cheese_camera_set_lux (CheeseCamera *camera, gdouble lux)
 {
   CheeseCameraPrivate *priv;
+  GstState state;
 
   g_return_if_fail (CHEESE_IS_CAMERA (camera));
 
@@ -1863,7 +1864,236 @@ cheese_camera_set_lux (CheeseCamera *camera, gdouble lux)
   if (!GST_IS_ELEMENT (priv->video_lux))
     return;
 
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
   g_object_set (G_OBJECT (priv->video_lux), "lux", lux, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_black:
+ * @camera: A #CheeseCamera
+ * @value: black adjustment value to be set
+ *
+ * Set the black adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_black (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "black", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_shadow:
+ * @camera: A #CheeseCamera
+ * @value: shadow adjustment value to be set
+ *
+ * Set the shadow adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_shadow (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "shadow", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_midtone:
+ * @camera: A #CheeseCamera
+ * @value: midtone adjustment value to be set
+ *
+ * Set the midtone adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_midtone (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "midtone", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_highlight:
+ * @camera: A #CheeseCamera
+ * @value: highlight adjustment value to be set
+ *
+ * Set the highlight adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_highlight (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "highlight", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_white:
+ * @camera: A #CheeseCamera
+ * @value: white adjustment value to be set
+ *
+ * Set the white adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_white (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "white", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_orange:
+ * @camera: A #CheeseCamera
+ * @value: orange adjustment value to be set
+ *
+ * Set the orange adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_orange (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "orange", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_blur:
+ * @camera: A #CheeseCamera
+ * @value: blur adjustment value to be set
+ *
+ * Set the blur adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_blur (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "blur", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_sharpness:
+ * @camera: A #CheeseCamera
+ * @value: sharpness adjustment value to be set
+ *
+ * Set the sharpness adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_sharpness (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "sharpness", value, NULL);
 }
 
 /**

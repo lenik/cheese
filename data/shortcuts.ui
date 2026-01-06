@@ -72,6 +72,108 @@
             </child>
 	  </object>
 	</child>
+	<child>
+        <object class="GtkShortcutsGroup">
+            <property name="visible">1</property>
+            <property name="title" translatable="yes" context="shortcut window">Lux Adjustments</property>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">1</property>
+                <property name="title" translatable="yes" context="shortcut window">Black increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">!</property>
+                <property name="title" translatable="yes" context="shortcut window">Black decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">2</property>
+                <property name="title" translatable="yes" context="shortcut window">Shadow increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">@</property>
+                <property name="title" translatable="yes" context="shortcut window">Shadow decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">3</property>
+                <property name="title" translatable="yes" context="shortcut window">Midtone increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">#</property>
+                <property name="title" translatable="yes" context="shortcut window">Midtone decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">4</property>
+                <property name="title" translatable="yes" context="shortcut window">Highlight increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">$</property>
+                <property name="title" translatable="yes" context="shortcut window">Highlight decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">5</property>
+                <property name="title" translatable="yes" context="shortcut window">White increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">%</property>
+                <property name="title" translatable="yes" context="shortcut window">White decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">y</property>
+                <property name="title" translatable="yes" context="shortcut window">Orange increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">Y</property>
+                <property name="title" translatable="yes" context="shortcut window">Orange decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">b</property>
+                <property name="title" translatable="yes" context="shortcut window">Blur increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">B</property>
+                <property name="title" translatable="yes" context="shortcut window">Blur decrease</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">s</property>
+                <property name="title" translatable="yes" context="shortcut window">Sharpness increase</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="accelerator">S</property>
+                <property name="title" translatable="yes" context="shortcut window">Sharpness decrease</property>
+              </object>
+            </child>
+	  </object>
+	</child>
       </object>
     </child>
   </object>

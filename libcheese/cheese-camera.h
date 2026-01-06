@@ -124,6 +124,14 @@ gboolean cheese_camera_get_balance_property_range (CheeseCamera *camera,
                                                    gdouble *min, gdouble *max, gdouble *def);
 void cheese_camera_set_balance_property (CheeseCamera *camera, const gchar *property, gdouble value);
 void cheese_camera_set_lux (CheeseCamera *camera, gdouble lux);
+void cheese_camera_set_lux_black (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_shadow (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_midtone (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_highlight (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_white (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_orange (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_blur (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_lux_sharpness (CheeseCamera *camera, gdouble value);
 void cheese_camera_toggle_effects_pipeline (CheeseCamera *camera, gboolean active);
 gchar *cheese_camera_get_recorded_time (CheeseCamera *camera);
 

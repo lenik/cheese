@@ -95,6 +95,62 @@
       <range min='-10' max='10'/>
     </key>
 
+    <key type='d' name='lux-black'>
+      <summary>Lux black adjustment</summary>
+      <description>Adjusts the black tones in the Lux tone curve</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-shadow'>
+      <summary>Lux shadow adjustment</summary>
+      <description>Adjusts the shadow tones in the Lux tone curve</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-midtone'>
+      <summary>Lux midtone adjustment</summary>
+      <description>Adjusts the midtone tones in the Lux tone curve</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-highlight'>
+      <summary>Lux highlight adjustment</summary>
+      <description>Adjusts the highlight tones in the Lux tone curve</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-white'>
+      <summary>Lux white adjustment</summary>
+      <description>Adjusts the white tones in the Lux tone curve</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-orange'>
+      <summary>Lux orange adjustment</summary>
+      <description>Adjusts the orange/warm tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-blur'>
+      <summary>Lux blur adjustment</summary>
+      <description>Adjusts the blur amount in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-sharpness'>
+      <summary>Lux sharpness adjustment</summary>
+      <description>Adjusts the sharpness amount in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
     <key type='s' name='video-path'>
       <summary>Video path</summary>
       <description>Defines the path where the videos are stored. If empty, “XDG_VIDEOS_DIR/Webcam” will be used.</description>

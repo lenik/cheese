@@ -44,6 +44,14 @@ namespace Cheese
     public void                        play ();
     public void                        set_balance_property (string property, double value);
     public void                        set_lux (double lux);
+    public void                        set_lux_black (double value);
+    public void                        set_lux_shadow (double value);
+    public void                        set_lux_midtone (double value);
+    public void                        set_lux_highlight (double value);
+    public void                        set_lux_white (double value);
+    public void                        set_lux_orange (double value);
+    public void                        set_lux_blur (double value);
+    public void                        set_lux_sharpness (double value);
     public void                        set_device (Cheese.CameraDevice device);
     public void                        set_effect (Cheese.Effect effect);
     public void                        toggle_effects_pipeline (bool active);
