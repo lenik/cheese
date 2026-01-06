@@ -1767,6 +1767,9 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             case 0x0010: // ctrl
                 mode = 'c'; // contrast
                 break;
+            case 0x0011: // ctrl + shift
+                mode = 'l'; // lux
+                break;
             case 0x0001: // shift
                 mode = 'b'; // brightness
                 break;
@@ -1799,6 +1802,9 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 break;
             case 'b':
                 current_value = settings.get_double ("brightness");
+                break;
+            case 'l':
+                current_value = settings.get_double ("lux");
                 break;
             default:
                 current_value = this.opacity;
@@ -1857,6 +1863,12 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-1.0, 1.0);
                 camera.set_balance_property ("brightness", new_value);
                 settings.set_double ("brightness", new_value);
+                break;
+
+            case 'l':
+                new_value = new_value.clamp (-10.0, 10.0);
+                camera.set_lux (new_value);
+                settings.set_double ("lux", new_value);
                 break;
             
             default:
@@ -2134,7 +2146,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
     private bool on_key_press (Gdk.EventKey event)
     {
-        // Ctrl+0 or Alt+C: Reset brightness, contrast, hue, saturation, and opacity
+        // Ctrl+0 or Alt+C: Reset brightness, contrast, hue, saturation, lux, and opacity
         bool alt_pressed = (event.state & Gdk.ModifierType.MOD1_MASK) != 0;
         bool ctrl_pressed = (event.state & Gdk.ModifierType.CONTROL_MASK) != 0;
         if (alt_pressed && event.keyval == 'c' || ctrl_pressed && event.keyval == '0') {
@@ -2146,6 +2158,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             double default_contrast = 1.0;
             double default_hue = 0.0;
             double default_saturation = 1.0;
+            double default_lux = 0.0;
             double default_opacity = 1.0;
             
             // Apply to camera
@@ -2153,12 +2166,14 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             camera.set_balance_property ("contrast", default_contrast);
             camera.set_balance_property ("hue", default_hue);
             camera.set_balance_property ("saturation", default_saturation);
+            camera.set_lux (default_lux);
             
             // Save to settings
             settings.set_double ("brightness", default_brightness);
             settings.set_double ("contrast", default_contrast);
             settings.set_double ("hue", default_hue);
             settings.set_double ("saturation", default_saturation);
+            settings.set_double ("lux", default_lux);
             
             // Reset opacity
             this.opacity = default_opacity;

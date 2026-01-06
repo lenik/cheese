@@ -107,6 +107,7 @@ gio_dep = dependency('gio-2.0')
 glib_dep = dependency('glib-2.0', version: '>= 2.38.0')
 gnome_desktop_dep = dependency('gnome-desktop-3.0')
 gstreamer_dep = dependency('gstreamer-1.0')
+gstreamer_video_dep = dependency('gstreamer-video-1.0')
 gstreamer_pbutils_dep = dependency('gstreamer-pbutils-1.0')
 gstreamer_plugins_bad_dep = dependency('gstreamer-plugins-bad-1.0', version: '>= 1.4')
 gtk_dep = dependency('gtk+-3.0', version: '>= 3.13.4')
@@ -176,6 +177,7 @@ endif
 
 subdir('data')
 subdir('libcheese')
+subdir('plugins/video_lux')
 subdir('src')
 
 if get_option('tests')

@@ -31,6 +31,7 @@
 #include <clutter/clutter.h>
 #include <clutter-gst/clutter-gst.h>
 #include <gst/gst.h>
+#include <gst/gstplugin.h>
 /* Avoid a warning. */
 #define GST_USE_UNSTABLE_API
 #include <gst/basecamerabinsrc/gstcamerabin-enum.h>
@@ -69,6 +70,7 @@ struct _CheeseCameraPrivate
   ClutterActor *video_texture;
 
   GstElement *effect_filter, *effects_capsfilter;
+  GstElement *video_lux;
   GstElement *video_balance;
   GstElement *camera_tee, *effects_tee;
   GstElement *main_valve, *effects_valve;
@@ -613,6 +615,12 @@ cheese_camera_create_video_filter_bin (CheeseCamera *camera, GError **error)
     return FALSE;
   }
   priv->current_effect_desc = g_strdup("identity");
+  /* Create video_lux element */
+  if ((priv->video_lux = gst_element_factory_make ("video_lux", "video_lux")) == NULL)
+  {
+    cheese_camera_set_error_element_not_found (error, "video_lux");
+    return FALSE;
+  }
   if ((priv->video_balance = gst_element_factory_make ("videobalance", "video_balance")) == NULL)
   {
     cheese_camera_set_error_element_not_found (error, "videobalance");
@@ -624,10 +632,10 @@ cheese_camera_create_video_filter_bin (CheeseCamera *camera, GError **error)
 
   gst_bin_add_many (GST_BIN (priv->video_filter_bin), priv->camera_tee,
                     priv->main_valve, priv->effect_filter,
-                    priv->video_balance, priv->effects_preview_bin, NULL);
+                    priv->video_lux, priv->video_balance, priv->effects_preview_bin, NULL);
 
   ok &= gst_element_link_many (priv->camera_tee, priv->main_valve,
-                               priv->effect_filter, priv->video_balance, NULL);
+                               priv->effect_filter, priv->video_lux, priv->video_balance, NULL);
   gst_pad_link (gst_element_get_request_pad (priv->camera_tee, "src_%u"),
                 gst_element_get_static_pad (priv->effects_preview_bin, "sink"));
 
@@ -861,7 +869,7 @@ cheese_camera_change_effect_filter (CheeseCamera *camera, GstElement *new_filter
   g_object_set (G_OBJECT (priv->main_valve), "drop", TRUE, NULL);
 
   gst_element_unlink_many (priv->main_valve, priv->effect_filter,
-                           priv->video_balance, NULL);
+                           priv->video_lux, priv->video_balance, NULL);
 
   g_object_ref (priv->effect_filter);
   gst_bin_remove (GST_BIN (priv->video_filter_bin), priv->effect_filter);
@@ -870,7 +878,7 @@ cheese_camera_change_effect_filter (CheeseCamera *camera, GstElement *new_filter
 
   gst_bin_add (GST_BIN (priv->video_filter_bin), new_filter);
   ok = gst_element_link_many (priv->main_valve, new_filter,
-                              priv->video_balance, NULL);
+                              priv->video_lux, priv->video_balance, NULL);
   gst_element_set_state (new_filter, GST_STATE_PAUSED);
 
   g_return_if_fail (ok);
@@ -1824,6 +1832,38 @@ cheese_camera_set_balance_property (CheeseCamera *camera, const gchar *property,
     priv = cheese_camera_get_instance_private (camera);
 
   g_object_set (G_OBJECT (priv->video_balance), property, value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux:
+ * @camera: A #CheeseCamera
+ * @lux: lux value to be set
+ *
+ * Set the lux value on the @camera. The lux effect applies:
+ * - black +2lux
+ * - shadow +lux
+ * - highlight -lux
+ * - white -2lux
+ * - orange brightness +0.3lux
+ * - sharpness +lux
+ *
+ * Note: Currently uses identity element as placeholder. A custom GStreamer
+ * plugin implementing the lux algorithm should replace the identity element
+ * in cheese_camera_create_video_filter_bin().
+ */
+void
+cheese_camera_set_lux (CheeseCamera *camera, gdouble lux)
+{
+  CheeseCameraPrivate *priv;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "lux", lux, NULL);
 }
 
 /**

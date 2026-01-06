@@ -468,6 +468,12 @@ public class Cheese.Application : Gtk.Application
             camera.set_balance_property ("saturation", value);
         }
 
+        value = settings.get_double ("lux");
+        if (value != 0.0)
+        {
+            camera.set_lux (value);
+        }
+
         camera.state_flags_changed.connect (on_camera_state_flags_changed);
         main_window.set_camera (camera);
         camera.play ();

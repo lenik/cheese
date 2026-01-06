@@ -43,6 +43,7 @@ namespace Cheese
     public bool                        has_camera ();
     public void                        play ();
     public void                        set_balance_property (string property, double value);
+    public void                        set_lux (double lux);
     public void                        set_device (Cheese.CameraDevice device);
     public void                        set_effect (Cheese.Effect effect);
     public void                        toggle_effects_pipeline (bool active);
