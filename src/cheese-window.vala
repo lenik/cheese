@@ -1745,8 +1745,37 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     private bool on_viewport_scroll (Gtk.Widget widget,
                                      Gdk.EventScroll event)
     {
-        if (!is_borderless)
-            return false;
+        // Check if Alt modifier is pressed for brightness adjustment
+        bool alt_pressed = (event.state & Gdk.ModifierType.MOD1_MASK) != 0;
+        bool ctrl_pressed = (event.state & Gdk.ModifierType.CONTROL_MASK) != 0;
+        bool shift_pressed = (event.state & Gdk.ModifierType.SHIFT_MASK) != 0;
+        bool win_pressed = (event.state & Gdk.ModifierType.SUPER_MASK) != 0;
+
+        int mode = (win_pressed ? 0x1000 : 0)
+                | (alt_pressed ? 0x0100 : 0)
+                | (ctrl_pressed ? 0x0010 : 0)
+                | (shift_pressed ? 0x0001 : 0);
+
+        switch (mode) {
+            case 0x1000: // win
+            case 0x0110: // alt + ctrl
+                mode = 'h'; // hue
+                break;
+            case 0x0100: // alt
+                mode = 's'; // saturation
+                break;
+            case 0x0010: // ctrl
+                mode = 'c'; // contrast
+                break;
+            case 0x0001: // shift
+                mode = 'b'; // brightness
+                break;
+            default:
+                mode = 'o'; // opacity
+                if (!is_borderless)
+                    return false;
+                break;
+        }
 
         // Check the source device type to distinguish mouse wheel from trackpad
         unowned Gdk.Device? source_device = event.get_source_device ();
@@ -1756,64 +1785,110 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             source = source_device.get_source ();
         }
         
-        double opacity_step = 0.05;
-        double current_opacity = this.opacity;
-        double new_opacity = current_opacity;
+        double value_step = 0.05;
+        double current_value;
+        switch (mode) {
+            case 'h':
+                current_value = settings.get_double ("hue");
+                break;
+            case 's':
+                current_value = settings.get_double ("saturation");
+                break;
+            case 'c':
+                current_value = settings.get_double ("contrast");
+                break;
+            case 'b':
+                current_value = settings.get_double ("brightness");
+                break;
+            default:
+                current_value = this.opacity;
+                break;
+        }
+
+        double new_value = current_value;
         
         switch (source) {
             case Gdk.InputSource.TOUCHPAD:
             case 7:
-                opacity_step = 0.01;
+                value_step = 0.01;
                 if (event.direction == Gdk.ScrollDirection.SMOOTH) {
                     double _delta_x, delta_y;
                     if (event.get_scroll_deltas (out _delta_x, out delta_y)) {
-                        // Use vertical delta (delta_y) for opacity change
+                        // Use vertical delta (delta_y) for value change
                         if (delta_y < 0)
-                            new_opacity = current_opacity - opacity_step;
+                            new_value = current_value - value_step;
                         else
-                            new_opacity = current_opacity + opacity_step;
+                            new_value = current_value + value_step;
                         break;
                     }
                 }
                 return false;
             default:
                 if (event.direction == Gdk.ScrollDirection.UP) {
-                    new_opacity = current_opacity - opacity_step;
+                    new_value = current_value - value_step;
                     break;
                 } else if (event.direction == Gdk.ScrollDirection.DOWN) {
-                    new_opacity = current_opacity + opacity_step;
+                    new_value = current_value + value_step;
                     break;
                 }
                 return false;
         }
 
-        // Clamp opacity between 0.01 and 1.0
-        new_opacity = new_opacity.clamp (0.01, 1.0);
-        
-        // Apply opacity to window
-        this.opacity = new_opacity;
-        
-        // Also set opacity on Clutter actors so camera preview respects opacity
-        // Clutter uses 0-255 range, GTK window uses 0.0-1.0 range
-        uint8 clutter_opacity = (uint8)(new_opacity * 255.0);
-        
-        // GStreamer video textures ignore Clutter actor opacity, so we rely on window opacity
-        // Window opacity should make everything transparent, including Clutter content
-        // Set opacity on the Clutter stage to match window opacity (though it may not work for video)
-        if (viewport != null) {
-            viewport.opacity = clutter_opacity;
+        switch (mode) {
+            case 'h':
+                new_value = new_value.clamp (-1.0, 1.0);
+                camera.set_balance_property ("hue", new_value);
+                settings.set_double ("hue", new_value);
+                break;
+
+            case 's':
+                new_value = new_value.clamp (0.0, 2.0);
+                camera.set_balance_property ("saturation", new_value);
+                settings.set_double ("saturation", new_value);
+                break;
+
+            case 'c':
+                new_value = new_value.clamp (0.0, 1.99);
+                camera.set_balance_property ("contrast", new_value);
+                settings.set_double ("contrast", new_value);
+                break;
+
+            case 'b':
+                new_value = new_value.clamp (-1.0, 1.0);
+                camera.set_balance_property ("brightness", new_value);
+                settings.set_double ("brightness", new_value);
+                break;
+            
+            default:
+            case 'o':
+                // Clamp opacity between 0.01 and 1.0
+                new_value = new_value.clamp (0.01, 1.0);
+                
+                // Apply opacity to window
+                this.opacity = new_value;
+                
+                // Also set opacity on Clutter actors so camera preview respects opacity
+                // Clutter uses 0-255 range, GTK window uses 0.0-1.0 range
+                uint8 clutter_opacity = (uint8)(new_value * 255.0);
+                
+                // GStreamer video textures ignore Clutter actor opacity, so we rely on window opacity
+                // Window opacity should make everything transparent, including Clutter content
+                // Set opacity on the Clutter stage to match window opacity (though it may not work for video)
+                if (viewport != null) {
+                    viewport.opacity = clutter_opacity;
+                }
+                
+                // set background layer opacity
+                if (background_layer != null) {
+                    background_layer.opacity = clutter_opacity;
+                }
+                
+                // Also set opacity on the video preview actor itself
+                if (video_preview != null) {
+                    video_preview.opacity = clutter_opacity;
+                }
+                break;
         }
-        
-        // set background layer opacity
-        if (background_layer != null) {
-            background_layer.opacity = clutter_opacity;
-        }
-        
-        // Also set opacity on the video preview actor itself
-        if (video_preview != null) {
-            video_preview.opacity = clutter_opacity;
-        }
-        
         return true;
     }
     
@@ -2059,6 +2134,49 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
     private bool on_key_press (Gdk.EventKey event)
     {
+        // Ctrl+0 or Alt+C: Reset brightness, contrast, hue, saturation, and opacity
+        bool alt_pressed = (event.state & Gdk.ModifierType.MOD1_MASK) != 0;
+        bool ctrl_pressed = (event.state & Gdk.ModifierType.CONTROL_MASK) != 0;
+        if (alt_pressed && event.keyval == 'c' || ctrl_pressed && event.keyval == '0') {
+            if (camera == null)
+                return false;
+            
+            // Reset to default values
+            double default_brightness = 0.0;
+            double default_contrast = 1.0;
+            double default_hue = 0.0;
+            double default_saturation = 1.0;
+            double default_opacity = 1.0;
+            
+            // Apply to camera
+            camera.set_balance_property ("brightness", default_brightness);
+            camera.set_balance_property ("contrast", default_contrast);
+            camera.set_balance_property ("hue", default_hue);
+            camera.set_balance_property ("saturation", default_saturation);
+            
+            // Save to settings
+            settings.set_double ("brightness", default_brightness);
+            settings.set_double ("contrast", default_contrast);
+            settings.set_double ("hue", default_hue);
+            settings.set_double ("saturation", default_saturation);
+            
+            // Reset opacity
+            this.opacity = default_opacity;
+            
+            // Also set opacity on Clutter actors
+            uint8 clutter_opacity = (uint8)(default_opacity * 255.0);
+            if (viewport != null) {
+                viewport.opacity = clutter_opacity;
+            }
+            if (background_layer != null) {
+                background_layer.opacity = clutter_opacity;
+            }
+            if (video_preview != null) {
+                video_preview.opacity = clutter_opacity;
+            }
+            return true;
+        }
+        
         switch (event.keyval) {
         case 'h':
             select_effect_by_name("Flip");
