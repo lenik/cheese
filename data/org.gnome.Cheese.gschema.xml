@@ -137,6 +137,55 @@
       <range min='-10' max='10'/>
     </key>
 
+    <key type='d' name='lux-red'>
+      <summary>Lux red adjustment</summary>
+      <description>Adjusts the red tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-yellow'>
+      <summary>Lux yellow adjustment</summary>
+      <description>Adjusts the yellow tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-green'>
+      <summary>Lux green adjustment</summary>
+      <description>Adjusts the green tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-cyan'>
+      <summary>Lux cyan adjustment</summary>
+      <description>Adjusts the cyan tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-blue'>
+      <summary>Lux blue adjustment</summary>
+      <description>Adjusts the blue tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-magenta'>
+      <summary>Lux magenta adjustment</summary>
+      <description>Adjusts the magenta tones in the Lux effect</description>
+      <default>0</default>
+      <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='lux-color-breadth'>
+      <summary>Lux color breadth</summary>
+      <description>Controls the breadth of selective color selection (0.0=narrow, 1.0=broad)</description>
+      <default>0.3</default>
+      <range min='0.0' max='1.0'/>
+    </key>
+
     <key type='d' name='lux-blur'>
       <summary>Lux blur adjustment</summary>
       <description>Adjusts the blur amount in the Lux effect</description>
@@ -149,6 +198,34 @@
       <description>Adjusts the sharpness amount in the Lux effect</description>
       <default>0</default>
       <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='canvas-scale'>
+      <summary>Canvas scale</summary>
+      <description>Scale factor for canvas transformation (1.0 = no scaling)</description>
+      <default>1.0</default>
+      <range min='0.1' max='10.0'/>
+    </key>
+
+    <key type='d' name='canvas-rotation'>
+      <summary>Canvas rotation</summary>
+      <description>Rotation angle in degrees for canvas transformation</description>
+      <default>0</default>
+      <range min='-360' max='360'/>
+    </key>
+
+    <key type='d' name='canvas-pan-x'>
+      <summary>Canvas pan X</summary>
+      <description>Pan offset in X direction (in pixels) for canvas transformation</description>
+      <default>0</default>
+      <range min='-10000' max='10000'/>
+    </key>
+
+    <key type='d' name='canvas-pan-y'>
+      <summary>Canvas pan Y</summary>
+      <description>Pan offset in Y direction (in pixels) for canvas transformation</description>
+      <default>0</default>
+      <range min='-10000' max='10000'/>
     </key>
 
     <key type='s' name='video-path'>

@@ -178,6 +178,7 @@ endif
 subdir('data')
 subdir('libcheese')
 subdir('plugins/video_lux')
+subdir('plugins/video_canvas')
 subdir('src')
 
 if get_option('tests')

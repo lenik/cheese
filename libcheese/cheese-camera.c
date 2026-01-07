@@ -71,6 +71,7 @@ struct _CheeseCameraPrivate
 
   GstElement *effect_filter, *effects_capsfilter;
   GstElement *video_lux;
+  GstElement *video_canvas;
   GstElement *video_balance;
   GstElement *camera_tee, *effects_tee;
   GstElement *main_valve, *effects_valve;
@@ -621,6 +622,12 @@ cheese_camera_create_video_filter_bin (CheeseCamera *camera, GError **error)
     cheese_camera_set_error_element_not_found (error, "video_lux");
     return FALSE;
   }
+  /* Create canvas element */
+  if ((priv->video_canvas = gst_element_factory_make ("canvas", "video_canvas")) == NULL)
+  {
+    cheese_camera_set_error_element_not_found (error, "canvas");
+    return FALSE;
+  }
   if ((priv->video_balance = gst_element_factory_make ("videobalance", "video_balance")) == NULL)
   {
     cheese_camera_set_error_element_not_found (error, "videobalance");
@@ -632,10 +639,10 @@ cheese_camera_create_video_filter_bin (CheeseCamera *camera, GError **error)
 
   gst_bin_add_many (GST_BIN (priv->video_filter_bin), priv->camera_tee,
                     priv->main_valve, priv->effect_filter,
-                    priv->video_lux, priv->video_balance, priv->effects_preview_bin, NULL);
+                    priv->video_lux, priv->video_canvas, priv->video_balance, priv->effects_preview_bin, NULL);
 
   ok &= gst_element_link_many (priv->camera_tee, priv->main_valve,
-                               priv->effect_filter, priv->video_lux, priv->video_balance, NULL);
+                               priv->effect_filter, priv->video_lux, priv->video_canvas, priv->video_balance, NULL);
   gst_pad_link (gst_element_get_request_pad (priv->camera_tee, "src_%u"),
                 gst_element_get_static_pad (priv->effects_preview_bin, "sink"));
 
@@ -869,7 +876,7 @@ cheese_camera_change_effect_filter (CheeseCamera *camera, GstElement *new_filter
   g_object_set (G_OBJECT (priv->main_valve), "drop", TRUE, NULL);
 
   gst_element_unlink_many (priv->main_valve, priv->effect_filter,
-                           priv->video_lux, priv->video_balance, NULL);
+                           priv->video_lux, priv->video_canvas, priv->video_balance, NULL);
 
   g_object_ref (priv->effect_filter);
   gst_bin_remove (GST_BIN (priv->video_filter_bin), priv->effect_filter);
@@ -878,7 +885,7 @@ cheese_camera_change_effect_filter (CheeseCamera *camera, GstElement *new_filter
 
   gst_bin_add (GST_BIN (priv->video_filter_bin), new_filter);
   ok = gst_element_link_many (priv->main_valve, new_filter,
-                              priv->video_lux, priv->video_balance, NULL);
+                              priv->video_lux, priv->video_canvas, priv->video_balance, NULL);
   gst_element_set_state (new_filter, GST_STATE_PAUSED);
 
   g_return_if_fail (ok);
@@ -2041,6 +2048,202 @@ cheese_camera_set_lux_orange (CheeseCamera *camera, gdouble value)
 }
 
 /**
+ * cheese_camera_set_lux_red:
+ * @camera: A #CheeseCamera
+ * @value: red adjustment value to be set
+ *
+ * Set the red adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_red (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "red", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_yellow:
+ * @camera: A #CheeseCamera
+ * @value: yellow adjustment value to be set
+ *
+ * Set the yellow adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_yellow (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "yellow", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_green:
+ * @camera: A #CheeseCamera
+ * @value: green adjustment value to be set
+ *
+ * Set the green adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_green (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "green", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_cyan:
+ * @camera: A #CheeseCamera
+ * @value: cyan adjustment value to be set
+ *
+ * Set the cyan adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_cyan (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "cyan", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_blue:
+ * @camera: A #CheeseCamera
+ * @value: blue adjustment value to be set
+ *
+ * Set the blue adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_blue (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "blue", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_magenta:
+ * @camera: A #CheeseCamera
+ * @value: magenta adjustment value to be set
+ *
+ * Set the magenta adjustment value on the @camera.
+ */
+void
+cheese_camera_set_lux_magenta (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "magenta", value, NULL);
+}
+
+/**
+ * cheese_camera_set_lux_color_breadth:
+ * @camera: A #CheeseCamera
+ * @value: color breadth value to be set (0.0=narrow, 1.0=broad)
+ *
+ * Set the color breadth value on the @camera.
+ */
+void
+cheese_camera_set_lux_color_breadth (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_lux))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_lux, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_lux), "color-breadth", value, NULL);
+}
+
+/**
  * cheese_camera_set_lux_blur:
  * @camera: A #CheeseCamera
  * @value: blur adjustment value to be set
@@ -2094,6 +2297,118 @@ cheese_camera_set_lux_sharpness (CheeseCamera *camera, gdouble value)
     return;
 
   g_object_set (G_OBJECT (priv->video_lux), "sharpness", value, NULL);
+}
+
+/**
+ * cheese_camera_set_canvas_scale:
+ * @camera: A #CheeseCamera
+ * @value: scale value to be set (1.0 = no scaling)
+ *
+ * Set the canvas scale value on the @camera.
+ */
+void
+cheese_camera_set_canvas_scale (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_canvas))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_canvas, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_canvas), "scale", value, NULL);
+}
+
+/**
+ * cheese_camera_set_canvas_rotation:
+ * @camera: A #CheeseCamera
+ * @value: rotation angle in degrees to be set
+ *
+ * Set the canvas rotation value on the @camera.
+ */
+void
+cheese_camera_set_canvas_rotation (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_canvas))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_canvas, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_canvas), "rotation", value, NULL);
+}
+
+/**
+ * cheese_camera_set_canvas_pan_x:
+ * @camera: A #CheeseCamera
+ * @value: pan offset in X direction (in pixels) to be set
+ *
+ * Set the canvas pan X value on the @camera.
+ */
+void
+cheese_camera_set_canvas_pan_x (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_canvas))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_canvas, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_canvas), "pan-x", value, NULL);
+}
+
+/**
+ * cheese_camera_set_canvas_pan_y:
+ * @camera: A #CheeseCamera
+ * @value: pan offset in Y direction (in pixels) to be set
+ *
+ * Set the canvas pan Y value on the @camera.
+ */
+void
+cheese_camera_set_canvas_pan_y (CheeseCamera *camera, gdouble value)
+{
+  CheeseCameraPrivate *priv;
+  GstState state;
+
+  g_return_if_fail (CHEESE_IS_CAMERA (camera));
+
+  priv = cheese_camera_get_instance_private (camera);
+
+  if (!GST_IS_ELEMENT (priv->video_canvas))
+    return;
+
+  /* Only set properties if element is in a valid state */
+  gst_element_get_state (priv->video_canvas, &state, NULL, 0);
+  if (state == GST_STATE_NULL)
+    return;
+
+  g_object_set (G_OBJECT (priv->video_canvas), "pan-y", value, NULL);
 }
 
 /**
