@@ -1,5 +1,5 @@
 project(
-  'cheese', ['c', 'vala'],
+  'cheese', ['c', 'cpp', 'vala'],
   version: '44.1',
   license: 'GPL2',
   default_options: 'buildtype=debugoptimized',
@@ -177,8 +177,9 @@ endif
 
 subdir('data')
 subdir('libcheese')
-subdir('plugins/video_lux')
 subdir('plugins/video_canvas')
+subdir('plugins/video_lux')
+subdir('plugins/video_fft')
 subdir('src')
 
 if get_option('tests')

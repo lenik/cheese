@@ -47,6 +47,7 @@ typedef struct _GstCanvasClass GstCanvasClass;
 struct _GstCanvas
 {
   GstVideoFilter base;
+  gboolean active;
   gdouble scale;
   gdouble rotation; /* in degrees */
   gdouble pan_x;    /* pan offset in x direction (in pixels) */
@@ -61,6 +62,7 @@ struct _GstCanvasClass
 enum
 {
   PROP_0,
+  PROP_ACTIVE,
   PROP_SCALE,
   PROP_ROTATION,
   PROP_PAN_X,
@@ -166,6 +168,9 @@ gst_canvas_class_init (GstCanvasClass * klass)
   gobject_class->set_property = gst_canvas_set_property;
   gobject_class->get_property = gst_canvas_get_property;
 
+  g_object_class_install_property (gobject_class, PROP_ACTIVE,
+      g_param_spec_boolean ("active", "Active", "Whether the canvas effect is active",
+          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_SCALE,
       g_param_spec_double ("scale", "Scale", "Scale factor (1.0 = no scaling)",
           0.1, 10.0, DEFAULT_SCALE,
@@ -200,6 +205,7 @@ gst_canvas_class_init (GstCanvasClass * klass)
 static void
 gst_canvas_init (GstCanvas * filter)
 {
+  filter->active = TRUE;
   filter->scale = DEFAULT_SCALE;
   filter->rotation = DEFAULT_ROTATION;
   filter->pan_x = DEFAULT_PAN_X;
@@ -213,6 +219,9 @@ gst_canvas_set_property (GObject * object, guint prop_id,
   GstCanvas *filter = GST_CANVAS (object);
 
   switch (prop_id) {
+    case PROP_ACTIVE:
+      filter->active = g_value_get_boolean (value);
+      break;
     case PROP_SCALE:
       filter->scale = g_value_get_double (value);
       break;
@@ -231,13 +240,16 @@ gst_canvas_set_property (GObject * object, guint prop_id,
   }
 }
 
-static void
+static void 
 gst_canvas_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
   GstCanvas *filter = GST_CANVAS (object);
 
   switch (prop_id) {
+    case PROP_ACTIVE:
+      g_value_set_boolean (value, filter->active);
+      break;
     case PROP_SCALE:
       g_value_set_double (value, filter->scale);
       break;
@@ -463,6 +475,25 @@ gst_canvas_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
     GstVideoFrame * outframe)
 {
   GstCanvas *filter = GST_CANVAS (base);
+  if (!filter->active) {
+    gst_video_frame_copy (outframe, inframe);
+    return GST_FLOW_OK;
+  }
+
+  // floating point comparison
+  gboolean has_scale = fabs(filter->scale - 1.0) > 1e-6;
+  gboolean has_rotation = fabs(filter->rotation - 0.0) > 1e-6;
+  gboolean has_pan_x = fabs(filter->pan_x - 0.0) > 1e-6;
+  gboolean has_pan_y = fabs(filter->pan_y - 0.0) > 1e-6;
+  gboolean no_scale = !has_scale;
+  gboolean no_rotation = !has_rotation;
+  gboolean no_pan_x = !has_pan_x;
+  gboolean no_pan_y = !has_pan_y;
+  if (no_scale && no_rotation && no_pan_x && no_pan_y) {
+    gst_video_frame_copy (outframe, inframe);
+    return GST_FLOW_OK;
+  }
+
   guint8 *in_data, *out_data;
   gint width, height, in_stride, out_stride;
   gint channels;
@@ -476,22 +507,17 @@ gst_canvas_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
 
   channels = GST_VIDEO_FRAME_N_COMPONENTS (inframe);
 
-  /* Check if any transformation is needed */
-  if (filter->scale == 1.0 && filter->rotation == 0.0 &&
-      filter->pan_x == 0.0 && filter->pan_y == 0.0) {
-    /* No transformation needed, just copy */
-    gst_video_frame_copy (outframe, inframe);
-    return GST_FLOW_OK;
-  }
-
   /* Clear output frame (black background) */
   memset (out_data, 0, height * out_stride);
 
+  gdouble margin90 = fabs(filter->rotation / 90.0);
+  margin90 = margin90 - floor(margin90);
+  gboolean is_90deg_rotation = margin90 < 1e-4;
+  
   /* Check for optimized paths */
   gint rotation_deg = (gint)(filter->rotation + 0.5); /* Round to nearest integer */
-  gboolean is_90deg_rotation = (rotation_deg % 90 == 0);
   
-  if (filter->rotation == 0.0) {
+  if (no_rotation) {
     /* Fastest path: scale-only (no rotation) */
     transform_scale_only (in_data, out_data, width, height,
                          in_stride, out_stride, channels,

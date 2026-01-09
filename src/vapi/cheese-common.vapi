@@ -43,6 +43,12 @@ namespace Cheese
     public bool                        has_camera ();
     public void                        play ();
     public void                        set_balance_property (string property, double value);
+    public void                        set_canvas_scale (double value);
+    public void                        set_canvas_rotation (double value);
+    public void                        set_canvas_pan_x (double value);
+    public void                        set_canvas_pan_y (double value);
+    public bool                        get_canvas_before_balance ();
+    public void                        toggle_canvas_position ();
     public void                        set_lux (double lux);
     public void                        set_lux_black (double value);
     public void                        set_lux_shadow (double value);
@@ -57,12 +63,8 @@ namespace Cheese
     public void                        set_lux_blue (double value);
     public void                        set_lux_magenta (double value);
     public void                        set_lux_color_breadth (double value);
-    public void                        set_lux_blur (double value);
-    public void                        set_lux_sharpness (double value);
-    public void                        set_canvas_scale (double value);
-    public void                        set_canvas_rotation (double value);
-    public void                        set_canvas_pan_x (double value);
-    public void                        set_canvas_pan_y (double value);
+    public void                        set_fft_blur (double value);
+    public void                        set_fft_sharp (double value);
     public void                        set_device (Cheese.CameraDevice device);
     public void                        set_effect (Cheese.Effect effect);
     public void                        toggle_effects_pipeline (bool active);

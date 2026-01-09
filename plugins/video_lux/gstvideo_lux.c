@@ -62,15 +62,6 @@ struct _GstVideoLux
   gdouble blue;
   gdouble magenta;
   gdouble color_breadth;
-  gdouble blur;
-  gdouble sharpness;
-  
-  /* FFT buffers for frequency domain processing */
-  gint fft_width;
-  gint fft_height;
-  gdouble *fft_real;
-  gdouble *fft_imag;
-  gdouble *fft_temp;
 };
 
 struct _GstVideoLuxClass
@@ -94,9 +85,7 @@ enum
   PROP_CYAN,
   PROP_BLUE,
   PROP_MAGENTA,
-  PROP_COLOR_BREADTH,
-  PROP_BLUR,
-  PROP_SHARPNESS
+  PROP_COLOR_BREADTH
 };
 
 #define DEFAULT_LUX 0.0
@@ -113,8 +102,6 @@ enum
 #define DEFAULT_BLUE 0.0
 #define DEFAULT_MAGENTA 0.0
 #define DEFAULT_COLOR_BREADTH 0.3
-#define DEFAULT_BLUR 0.0
-#define DEFAULT_SHARPNESS 0.0
 
 static GstStaticPadTemplate gst_video_lux_src_template =
 GST_STATIC_PAD_TEMPLATE ("src",
@@ -320,257 +307,6 @@ calculate_magenta_component_int (guint8 r, guint8 g, guint8 b, gdouble breadth)
   return calculate_selective_color_int (r, g, b, 128, -256, 128, breadth);
 }
 
-/* Simple 1D FFT using Cooley-Tukey algorithm (radix-2) */
-static void
-fft_1d (gdouble *real, gdouble *imag, gint n, gint inverse)
-{
-  gint i, j, k, m;
-  gdouble angle, w_real, w_imag, t_real, t_imag;
-  gdouble scale = inverse ? 1.0 / n : 1.0;
-  
-  /* Bit-reverse permutation */
-  j = 0;
-  for (i = 1; i < n; i++) {
-    gint bit = n >> 1;
-    for (; j & bit; bit >>= 1)
-      j ^= bit;
-    j ^= bit;
-    if (i < j) {
-      gdouble tmp = real[i];
-      real[i] = real[j];
-      real[j] = tmp;
-      tmp = imag[i];
-      imag[i] = imag[j];
-      imag[j] = tmp;
-    }
-  }
-  
-  /* FFT computation */
-  for (m = 2; m <= n; m <<= 1) {
-    angle = (inverse ? 2.0 : -2.0) * M_PI / m;
-    w_real = cos (angle);
-    w_imag = sin (angle);
-    
-    for (k = 0; k < n; k += m) {
-      gdouble u_real = 1.0;
-      gdouble u_imag = 0.0;
-      
-      for (j = 0; j < m / 2; j++) {
-        gint t = k + j + m / 2;
-        t_real = u_real * real[t] - u_imag * imag[t];
-        t_imag = u_real * imag[t] + u_imag * real[t];
-        
-        real[t] = real[k + j] - t_real;
-        imag[t] = imag[k + j] - t_imag;
-        real[k + j] += t_real;
-        imag[k + j] += t_imag;
-        
-        gdouble next_u_real = u_real * w_real - u_imag * w_imag;
-        u_imag = u_real * w_imag + u_imag * w_real;
-        u_real = next_u_real;
-      }
-    }
-  }
-  
-  /* Scale for inverse FFT */
-  if (inverse) {
-    for (i = 0; i < n; i++) {
-      real[i] *= scale;
-      imag[i] *= scale;
-    }
-  }
-}
-
-/* Calculate next power of 2 */
-static gint
-next_power_of_2 (gint n)
-{
-  gint p = 1;
-  while (p < n)
-    p <<= 1;
-  return p;
-}
-
-/* Apply frequency domain filter using FFT */
-static void
-apply_fft_filter (guint8 *pixels, gint width, gint height, gint stride,
-                  gint channels, gint channel_idx, gdouble blur_val, gdouble sharpness_val)
-{
-  gint fft_w = next_power_of_2 (width);
-  gint fft_h = next_power_of_2 (height);
-  gint i, j;
-  gdouble *real, *imag, *temp_real, *temp_imag;
-  
-  /* Allocate FFT buffers */
-  real = g_malloc (fft_w * fft_h * sizeof (gdouble));
-  imag = g_malloc (fft_w * fft_h * sizeof (gdouble));
-  temp_real = g_malloc (fft_w * sizeof (gdouble));
-  temp_imag = g_malloc (fft_w * sizeof (gdouble));
-  
-  if (!real || !imag || !temp_real || !temp_imag) {
-    g_free (real);
-    g_free (imag);
-    g_free (temp_real);
-    g_free (temp_imag);
-    return;
-  }
-  
-  /* Copy image data to FFT buffer */
-  for (j = 0; j < height; j++) {
-    guint8 *row = pixels + j * stride;
-    for (i = 0; i < width; i++) {
-      gint idx = j * fft_w + i;
-      real[idx] = (gdouble) row[i * channels + channel_idx];
-      imag[idx] = 0.0;
-    }
-    /* Zero-pad to FFT width */
-    for (i = width; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      real[idx] = 0.0;
-      imag[idx] = 0.0;
-    }
-  }
-  /* Zero-pad to FFT height */
-  for (j = height; j < fft_h; j++) {
-    for (i = 0; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      real[idx] = 0.0;
-      imag[idx] = 0.0;
-    }
-  }
-  
-  /* 2D FFT: First transform rows */
-  for (j = 0; j < fft_h; j++) {
-    for (i = 0; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      temp_real[i] = real[idx];
-      temp_imag[i] = imag[idx];
-    }
-    fft_1d (temp_real, temp_imag, fft_w, 0);
-    for (i = 0; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      real[idx] = temp_real[i];
-      imag[idx] = temp_imag[i];
-    }
-  }
-  
-  /* Then transform columns */
-  for (i = 0; i < fft_w; i++) {
-    for (j = 0; j < fft_h; j++) {
-      gint idx = j * fft_w + i;
-      temp_real[j] = real[idx];
-      temp_imag[j] = imag[idx];
-    }
-    fft_1d (temp_real, temp_imag, fft_h, 0);
-    for (j = 0; j < fft_h; j++) {
-      gint idx = j * fft_w + i;
-      real[idx] = temp_real[j];
-      imag[idx] = temp_imag[j];
-    }
-  }
-  
-  /* Apply frequency response curve */
-  gdouble center_x = fft_w / 2.0;
-  gdouble center_y = fft_h / 2.0;
-  gdouble max_freq = sqrt (center_x * center_x + center_y * center_y);
-  
-  for (j = 0; j < fft_h; j++) {
-    for (i = 0; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      gdouble dx = i - center_x;
-      gdouble dy = j - center_y;
-      gdouble freq = sqrt (dx * dx + dy * dy);
-      gdouble normalized_freq = freq / max_freq; /* 0.0 to 1.0 */
-      
-      /* Smooth frequency response curve */
-      /* For blur: reduce high frequencies (smooth rolloff) */
-      /* For sharpness: enhance high frequencies (smooth boost) */
-      gdouble response = 1.0;
-      
-      if (blur_val != 0.0) {
-        /* Blur: smooth low-pass filter */
-        /* Use smooth curve: 1.0 at DC, decreasing for higher frequencies */
-        gdouble blur_strength = fabs (blur_val) * 0.1;
-        gdouble cutoff = 0.3 + blur_strength * 0.5; /* Adjustable cutoff */
-        /* Smooth rolloff using cosine curve */
-        if (normalized_freq > cutoff) {
-          gdouble rolloff = (normalized_freq - cutoff) / (1.0 - cutoff);
-          response *= (1.0 - blur_strength) * (0.5 + 0.5 * cos (M_PI * rolloff));
-        } else {
-          /* Preserve low frequencies */
-          gdouble preserve = 1.0 - blur_strength * (normalized_freq / cutoff);
-          response *= preserve;
-        }
-      }
-      
-      if (sharpness_val != 0.0) {
-        /* Sharpness: smooth high-frequency boost */
-        gdouble sharp_strength = fabs (sharpness_val) * 0.15;
-        gdouble boost_start = 0.1; /* Start boosting from this frequency */
-        if (normalized_freq > boost_start) {
-          gdouble boost_factor = 1.0 + sharp_strength * 
-                                 (0.5 + 0.5 * sin (M_PI * (normalized_freq - boost_start) / (1.0 - boost_start)));
-          response *= boost_factor;
-        }
-      }
-      
-      /* Preserve DC component (brightness) */
-      if (i == 0 && j == 0) {
-        response = 1.0;
-      }
-      
-      /* Apply frequency response */
-      real[idx] *= response;
-      imag[idx] *= response;
-    }
-  }
-  
-  /* Inverse 2D FFT: First transform columns */
-  for (i = 0; i < fft_w; i++) {
-    for (j = 0; j < fft_h; j++) {
-      gint idx = j * fft_w + i;
-      temp_real[j] = real[idx];
-      temp_imag[j] = imag[idx];
-    }
-    fft_1d (temp_real, temp_imag, fft_h, 1);
-    for (j = 0; j < fft_h; j++) {
-      gint idx = j * fft_w + i;
-      real[idx] = temp_real[j];
-      imag[idx] = temp_imag[j];
-    }
-  }
-  
-  /* Then transform rows */
-  for (j = 0; j < fft_h; j++) {
-    for (i = 0; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      temp_real[i] = real[idx];
-      temp_imag[i] = imag[idx];
-    }
-    fft_1d (temp_real, temp_imag, fft_w, 1);
-    for (i = 0; i < fft_w; i++) {
-      gint idx = j * fft_w + i;
-      real[idx] = temp_real[i];
-      imag[idx] = temp_imag[i];
-    }
-  }
-  
-  /* Copy back to image */
-  for (j = 0; j < height; j++) {
-    guint8 *row = pixels + j * stride;
-    for (i = 0; i < width; i++) {
-      gint idx = j * fft_w + i;
-      gint value = (gint) (real[idx] + 0.5);
-      row[i * channels + channel_idx] = CLAMP (value, 0, 255);
-    }
-  }
-  
-  g_free (real);
-  g_free (imag);
-  g_free (temp_real);
-  g_free (temp_imag);
-}
-
 static void
 gst_video_lux_class_init (GstVideoLuxClass * klass)
 {
@@ -637,14 +373,6 @@ gst_video_lux_class_init (GstVideoLuxClass * klass)
       g_param_spec_double ("color-breadth", "Color Breadth", "Selective color breadth (0.0=narrow, 1.0=broad)",
           0.0, 1.0, DEFAULT_COLOR_BREADTH,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (gobject_class, PROP_BLUR,
-      g_param_spec_double ("blur", "Blur", "Blur adjustment value",
-          -10.0, 10.0, DEFAULT_BLUR,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (gobject_class, PROP_SHARPNESS,
-      g_param_spec_double ("sharpness", "Sharpness", "Sharpness adjustment value",
-          -10.0, 10.0, DEFAULT_SHARPNESS,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gst_element_class_set_static_metadata (gstelement_class,
       "Video Lux", "Filter/Effect/Video",
@@ -677,8 +405,6 @@ gst_video_lux_init (GstVideoLux * filter)
   filter->blue = DEFAULT_BLUE;
   filter->magenta = DEFAULT_MAGENTA;
   filter->color_breadth = DEFAULT_COLOR_BREADTH;
-  filter->blur = DEFAULT_BLUR;
-  filter->sharpness = DEFAULT_SHARPNESS;
 }
 
 static void
@@ -729,12 +455,6 @@ gst_video_lux_set_property (GObject * object, guint prop_id,
       break;
     case PROP_COLOR_BREADTH:
       filter->color_breadth = g_value_get_double (value);
-      break;
-    case PROP_BLUR:
-      filter->blur = g_value_get_double (value);
-      break;
-    case PROP_SHARPNESS:
-      filter->sharpness = g_value_get_double (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -791,12 +511,6 @@ gst_video_lux_get_property (GObject * object, guint prop_id,
     case PROP_COLOR_BREADTH:
       g_value_set_double (value, filter->color_breadth);
       break;
-    case PROP_BLUR:
-      g_value_set_double (value, filter->blur);
-      break;
-    case PROP_SHARPNESS:
-      g_value_set_double (value, filter->sharpness);
-      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -826,7 +540,7 @@ gst_video_lux_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
       filter->midtone == 0.0 && filter->highlight == 0.0 && filter->white == 0.0 &&
       filter->orange == 0.0 && filter->red == 0.0 && filter->yellow == 0.0 &&
       filter->green == 0.0 && filter->cyan == 0.0 && filter->blue == 0.0 &&
-      filter->magenta == 0.0 && filter->blur == 0.0 && filter->sharpness == 0.0) {
+      filter->magenta == 0.0) {
     /* No adjustment needed, just copy */
     gst_video_frame_copy (outframe, inframe);
     return GST_FLOW_OK;
@@ -904,15 +618,6 @@ gst_video_lux_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
       if (channels == 4) {
         out_row[idx + 3] = in_row[idx + 3];
       }
-    }
-  }
-
-  /* Second pass: apply FFT-based blur and sharpness if needed */
-  if (filter->blur != 0.0 || filter->sharpness != 0.0) {
-    /* Process each color channel separately */
-    for (gint c = 0; c < channels && c < 3; c++) {
-      apply_fft_filter (out_data, width, height, out_stride, channels, c,
-                        filter->blur, filter->sharpness);
     }
   }
 

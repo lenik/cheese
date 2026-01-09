@@ -137,12 +137,14 @@ void cheese_camera_set_lux_cyan (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_lux_blue (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_lux_magenta (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_lux_color_breadth (CheeseCamera *camera, gdouble value);
-void cheese_camera_set_lux_blur (CheeseCamera *camera, gdouble value);
-void cheese_camera_set_lux_sharpness (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_fft_blur (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_fft_sharp (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_scale (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_rotation (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_pan_x (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_pan_y (CheeseCamera *camera, gdouble value);
+void cheese_camera_toggle_canvas_position (CheeseCamera *camera);
+gboolean cheese_camera_get_canvas_before_balance (CheeseCamera *camera);
 void cheese_camera_toggle_effects_pipeline (CheeseCamera *camera, gboolean active);
 gchar *cheese_camera_get_recorded_time (CheeseCamera *camera);
 

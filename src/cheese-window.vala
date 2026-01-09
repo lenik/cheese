@@ -1745,7 +1745,6 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     private bool on_viewport_scroll (Gtk.Widget widget,
                                      Gdk.EventScroll event)
     {
-        // Check if Alt modifier is pressed for brightness adjustment
         bool alt_pressed = (event.state & Gdk.ModifierType.MOD1_MASK) != 0;
         bool ctrl_pressed = (event.state & Gdk.ModifierType.CONTROL_MASK) != 0;
         bool shift_pressed = (event.state & Gdk.ModifierType.SHIFT_MASK) != 0;
@@ -2178,19 +2177,32 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             double default_lux_blue = 0.0;
             double default_lux_magenta = 0.0;
             double default_lux_color_breadth = 0.3;
-            double default_lux_blur = 0.0;
-            double default_lux_sharpness = 0.0;
+            double default_fft_blur = 0.0;
+            double default_fft_sharp = 0.0;
             double default_canvas_scale = 1.0;
             double default_canvas_rotation = 0.0;
             double default_canvas_pan_x = 0.0;
             double default_canvas_pan_y = 0.0;
             double default_opacity = 1.0;
             
+            bool canvas_before_balance = camera.get_canvas_before_balance ();
+
             // Apply to camera
             camera.set_balance_property ("brightness", default_brightness);
             camera.set_balance_property ("contrast", default_contrast);
             camera.set_balance_property ("hue", default_hue);
             camera.set_balance_property ("saturation", default_saturation);
+            
+            if (canvas_before_balance) {
+                camera.set_canvas_scale (default_canvas_scale);
+                camera.set_canvas_rotation (default_canvas_rotation);
+                camera.set_canvas_pan_x (default_canvas_pan_x);
+                camera.set_canvas_pan_y (default_canvas_pan_y);
+            } else {
+                // canvas after fft for diagnostic
+                // so don't reset it
+            }
+
             camera.set_lux (default_lux);
             camera.set_lux_black (default_lux_black);
             camera.set_lux_shadow (default_lux_shadow);
@@ -2205,18 +2217,18 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             camera.set_lux_blue (default_lux_blue);
             camera.set_lux_magenta (default_lux_magenta);
             camera.set_lux_color_breadth (default_lux_color_breadth);
-            camera.set_lux_blur (default_lux_blur);
-            camera.set_lux_sharpness (default_lux_sharpness);
-            camera.set_canvas_scale (default_canvas_scale);
-            camera.set_canvas_rotation (default_canvas_rotation);
-            camera.set_canvas_pan_x (default_canvas_pan_x);
-            camera.set_canvas_pan_y (default_canvas_pan_y);
+            camera.set_fft_blur (default_fft_blur);
+            camera.set_fft_sharp (default_fft_sharp);
             
             // Save to settings
             settings.set_double ("brightness", default_brightness);
             settings.set_double ("contrast", default_contrast);
             settings.set_double ("hue", default_hue);
             settings.set_double ("saturation", default_saturation);
+            settings.set_double ("canvas-scale", default_canvas_scale);
+            settings.set_double ("canvas-rotation", default_canvas_rotation);
+            settings.set_double ("canvas-pan-x", default_canvas_pan_x);
+            settings.set_double ("canvas-pan-y", default_canvas_pan_y);
             settings.set_double ("lux", default_lux);
             settings.set_double ("lux-black", default_lux_black);
             settings.set_double ("lux-shadow", default_lux_shadow);
@@ -2231,12 +2243,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             settings.set_double ("lux-blue", default_lux_blue);
             settings.set_double ("lux-magenta", default_lux_magenta);
             settings.set_double ("lux-color-breadth", default_lux_color_breadth);
-            settings.set_double ("lux-blur", default_lux_blur);
-            settings.set_double ("lux-sharpness", default_lux_sharpness);
-            settings.set_double ("canvas-scale", default_canvas_scale);
-            settings.set_double ("canvas-rotation", default_canvas_rotation);
-            settings.set_double ("canvas-pan-x", default_canvas_pan_x);
-            settings.set_double ("canvas-pan-y", default_canvas_pan_y);
+            settings.set_double ("fft-blur", default_fft_blur);
+            settings.set_double ("fft-sharp", default_fft_sharp);
             
             // Reset opacity
             this.opacity = default_opacity;
@@ -2262,7 +2270,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         double current_value;
         double new_value;
         
-        int key_class = 0; // c for canvas, l for lux
+        int key_class = 0; // c for canvas, l for lux, f for fft
 
         switch (keyval_lower) {
             case Gdk.Key.plus:
@@ -2289,21 +2297,21 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
             case Gdk.Key.Left:
                 if (ctrl_pressed) {
-                    // Rotate counter-clockwise 90 degrees
+                    // Rotate clockwise 90 degrees
                     current_value = settings.get_double ("canvas-rotation");
-                    new_value = current_value - 90.0;
+                    new_value = current_value + 90.0;
                     // Normalize to -360 to 360 range
-                    while (new_value < -360.0) new_value += 360.0;
+                    while (new_value > 360.0) new_value -= 360.0;
                     camera.set_canvas_rotation (new_value);
                     settings.set_double ("canvas-rotation", new_value);
                     key_class = 'c';
                     break;
                 } else if (alt_pressed) {
-                    // Rotate counter-clockwise 2.5 degrees
+                    // Rotate clockwise 2.5 degrees
                     current_value = settings.get_double ("canvas-rotation");
-                    new_value = current_value - 2.5;
+                    new_value = current_value + 2.5;
                     // Normalize to -360 to 360 range
-                    while (new_value < -360.0) new_value += 360.0;
+                    while (new_value > 360.0) new_value -= 360.0;
                     camera.set_canvas_rotation (new_value);
                     settings.set_double ("canvas-rotation", new_value);
                     key_class = 'c';
@@ -2321,21 +2329,21 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
             case Gdk.Key.Right:
                 if (ctrl_pressed) {
-                    // Rotate clockwise 90 degrees
+                    // Rotate counter-clockwise 90 degrees
                     current_value = settings.get_double ("canvas-rotation");
-                    new_value = current_value + 90.0;
+                    new_value = current_value - 90.0;
                     // Normalize to -360 to 360 range
-                    while (new_value > 360.0) new_value -= 360.0;
+                    while (new_value < -360.0) new_value += 360.0;
                     camera.set_canvas_rotation (new_value);
                     settings.set_double ("canvas-rotation", new_value);
                     key_class = 'c';
                     break;
                 } else if (alt_pressed) {
-                    // Rotate clockwise 2.5 degrees
+                    // Rotate counter-clockwise 2.5 degrees
                     current_value = settings.get_double ("canvas-rotation");
-                    new_value = current_value + 2.5;
+                    new_value = current_value - 2.5;
                     // Normalize to -360 to 360 range
-                    while (new_value > 360.0) new_value -= 360.0;
+                    while (new_value < -360.0) new_value += 360.0;
                     camera.set_canvas_rotation (new_value);
                     settings.set_double ("canvas-rotation", new_value);
                     key_class = 'c';
@@ -2372,6 +2380,17 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                     settings.set_double ("canvas-pan-y", new_value);
                     key_class = 'c';
                     break;
+                }
+                break;
+
+            case 't':
+            case 'T':
+                // Toggle canvas position between before balance and after lux
+                if (no_modifier) {
+                    camera.toggle_canvas_position ();
+                    GLib.debug ("Canvas position toggled: %s",
+                        camera.get_canvas_before_balance () ? "before balance" : "after fft");
+                    return true;
                 }
                 break;
 
@@ -2477,20 +2496,20 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 key_class = 'l';
                 break;
             case 'u': // blur: u+ increase, U- decrease (changed from 'b' to avoid conflict with blue)
-                current_value = settings.get_double ("lux-blur");
+                current_value = settings.get_double ("fft-blur");
                 new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-10.0, 10.0);
-                camera.set_lux_blur (new_value);
-                settings.set_double ("lux-blur", new_value);
-                key_class = 'l';
+                camera.set_fft_blur (new_value);
+                settings.set_double ("fft-blur", new_value);
+                key_class = 'f';
                 break;
-            case 's': // sharpness: s+ increase, S- decrease
-                current_value = settings.get_double ("lux-sharpness");
+            case 's': // sharp: s+ increase, S- decrease
+                current_value = settings.get_double ("fft-sharp");
                 new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-10.0, 10.0);
-                camera.set_lux_sharpness (new_value);
-                settings.set_double ("lux-sharpness", new_value);
-                key_class = 'l';
+                camera.set_fft_sharp (new_value);
+                settings.set_double ("fft-sharp", new_value);
+                key_class = 'f';
                 break;
             case 'h':
                 select_effect_by_name("Flip");
@@ -2500,8 +2519,15 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 return true;
         }
         switch (key_class) {
+            case 'c':
+                GLib.debug("canvas: scale %.2f, rotation %.2f, panx %.2f, pan_y %.2f", 
+                    settings.get_double ("canvas-scale"),
+                    settings.get_double ("canvas-rotation"),
+                    settings.get_double ("canvas-pan-x"),
+                    settings.get_double ("canvas-pan-y"));
+                return true;
             case 'l':
-                stdout.printf("lux: %.2f %.2f <%.2f> %.2f %.2f, o %.2f, r %.2f, y %.2f, g %.2f, c %.2f, b %.2f, m %.2f; blur %.3f, sharpness %.3f\n", 
+                GLib.debug("lux: %.2f %.2f <%.2f> %.2f %.2f, o %.2f, r %.2f, y %.2f, g %.2f, c %.2f, b %.2f, m %.2f", 
                     settings.get_double ("lux-black"),
                     settings.get_double ("lux-shadow"),
                     settings.get_double ("lux-midtone"),
@@ -2513,16 +2539,12 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                     settings.get_double ("lux-green"),
                     settings.get_double ("lux-cyan"),
                     settings.get_double ("lux-blue"),
-                    settings.get_double ("lux-magenta"),
-                    settings.get_double ("lux-blur"),
-                    settings.get_double ("lux-sharpness"));
+                    settings.get_double ("lux-magenta"));
                 return true;
-            case 'c':
-                stdout.printf("canvas: scale %.2f, rotation %.2f, pan_x %.2f, pan_y %.2f\n", 
-                    settings.get_double ("canvas-scale"),
-                    settings.get_double ("canvas-rotation"),
-                    settings.get_double ("canvas-pan-x"),
-                    settings.get_double ("canvas-pan-y"));
+            case 'f':
+                GLib.debug("fft: blur %.3f, sharp %.3f", 
+                    settings.get_double ("fft-blur"),
+                    settings.get_double ("fft-sharp"));
                 return true;
         }
         return false;
