@@ -1787,7 +1787,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             source = source_device.get_source ();
         }
         
-        double value_step = 0.05;
+        double value_step = 0.01;
         double current_value;
         switch (mode) {
             case 'h':
@@ -1844,30 +1844,35 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-1.0, 1.0);
                 camera.set_balance_property ("hue", new_value);
                 settings.set_double ("hue", new_value);
+                GLib.debug("hue: %.2f", new_value);
                 break;
 
             case 's':
                 new_value = new_value.clamp (0.0, 2.0);
                 camera.set_balance_property ("saturation", new_value);
                 settings.set_double ("saturation", new_value);
+                GLib.debug("saturation: %.2f", new_value);
                 break;
 
             case 'c':
                 new_value = new_value.clamp (0.0, 1.99);
                 camera.set_balance_property ("contrast", new_value);
                 settings.set_double ("contrast", new_value);
+                GLib.debug("contrast: %.2f", new_value);
                 break;
 
             case 'b':
                 new_value = new_value.clamp (-1.0, 1.0);
                 camera.set_balance_property ("brightness", new_value);
                 settings.set_double ("brightness", new_value);
+                GLib.debug("brightness: %.2f", new_value);
                 break;
 
             case 'l':
                 new_value = new_value.clamp (-10.0, 10.0);
                 camera.set_lux (new_value);
                 settings.set_double ("lux", new_value);
+                GLib.debug("lux: %.2f", new_value);
                 break;
             
             default:
@@ -1898,6 +1903,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 if (video_preview != null) {
                     video_preview.opacity = clutter_opacity;
                 }
+
+                GLib.debug("opacity: %.2f", new_value);
                 break;
         }
         return true;
@@ -2495,6 +2502,15 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 settings.set_double ("lux-magenta", new_value);
                 key_class = 'l';
                 break;
+            case '9': // exposure: 9+ increase, (- decrease
+            case '(':
+                current_value = settings.get_double ("lux");
+                new_value = (keyval == '9') ? current_value + step : current_value - step;
+                new_value = new_value.clamp (-10.0, 10.0);
+                camera.set_lux (new_value);
+                settings.set_double ("lux", new_value);
+                key_class = 'l';
+                break;
             case 'u': // blur: u+ increase, U- decrease (changed from 'b' to avoid conflict with blue)
                 current_value = settings.get_double ("fft-blur");
                 new_value = shift_pressed ? current_value - step : current_value + step;
@@ -2527,7 +2543,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                     settings.get_double ("canvas-pan-y"));
                 return true;
             case 'l':
-                GLib.debug("lux: %.2f %.2f <%.2f> %.2f %.2f, o %.2f, r %.2f, y %.2f, g %.2f, c %.2f, b %.2f, m %.2f", 
+                GLib.debug("lux: [%.2f] %.2f %.2f <%.2f> %.2f %.2f, o %.2f, r %.2f, y %.2f, g %.2f, c %.2f, b %.2f, m %.2f",
+                    settings.get_double ("lux"),
                     settings.get_double ("lux-black"),
                     settings.get_double ("lux-shadow"),
                     settings.get_double ("lux-midtone"),

@@ -209,26 +209,26 @@ apply_tone_curve_int (gint luminance, gint black_int, gint shadow_int, gint midt
 
 /* Calculate selective color component with breadth control */
 static inline gint
-calculate_selective_color_int (guint8 r, guint8 g, guint8 b, 
+calculate_selective_color_int (guint8 r, guint8 g, guint8 b,
                                 gint r_coeff, gint g_coeff, gint b_coeff,
-                                gdouble breadth)
+                                gint breadth)
 {
   /* Calculate color component using weighted RGB values */
   /* Coefficients are in 0-256 range, can be negative */
   gint color_raw = (r_coeff * r + g_coeff * g + b_coeff * b);
-  
+
   /* Normalize: shift to positive range, then scale to 0-255 */
   /* Assuming max positive value is around 256*255 = 65280, max negative is around -256*255 = -65280 */
   /* Shift by 65280 to make it positive, then divide by 512 to get 0-255 range */
   gint color = CLAMP ((color_raw + 65280) / 512, 0, 255);
-  
+
   /* Apply breadth: higher breadth = broader selection, lower = narrower */
-  /* Use a threshold based on breadth: 0.0 = very narrow (high threshold), 1.0 = very broad (low threshold) */
+  /* Use a threshold based on breadth: 0 = very narrow (high threshold), 100 = very broad (low threshold) */
   /* Narrow selection by requiring higher color component values */
   gint min_threshold = 80;   /* Minimum threshold for very broad selection */
   gint max_threshold = 200;  /* Maximum threshold for very narrow selection */
-  gint threshold = (gint)(min_threshold + (1.0 - breadth) * (max_threshold - min_threshold));
-  
+  gint threshold = min_threshold + ((100 - breadth) * (max_threshold - min_threshold)) / 100;
+
   if (color < threshold) {
     /* Scale down colors below threshold - narrower breadth means more aggressive scaling */
     gint diff = threshold - color;
@@ -236,8 +236,7 @@ calculate_selective_color_int (guint8 r, guint8 g, guint8 b,
     if (max_diff > 0) {
       /* Linear falloff with breadth-dependent scaling */
       /* For narrow breadth (low value), scale more aggressively */
-      gint breadth_int = (gint)(breadth * 256); /* 0-256 range */
-      gint scale_numerator = (256 - breadth_int) * diff + breadth_int * max_diff;
+      gint scale_numerator = (256 - breadth) * diff + breadth * max_diff;
       color = (color * scale_numerator) / (max_diff * 256);
     } else {
       color = 0;
@@ -246,7 +245,7 @@ calculate_selective_color_int (guint8 r, guint8 g, guint8 b,
     /* Full strength for colors above threshold */
     color = 255;
   }
-  
+
   return CLAMP (color, 0, 255);
 }
 
@@ -547,6 +546,9 @@ gst_video_lux_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
   }
 
   /* Convert values to integer (multiply by 256 for fixed-point arithmetic) */
+  /* Exposure compensation uses 2^lux as multiplier */
+  gdouble exposure_multiplier = pow(2.0, filter->lux);
+  gint exposure_mult_int = (gint) (exposure_multiplier * 256.0); /* Fixed-point multiplier */
   gint black_int = (gint) (filter->black * 256.0);
   gint shadow_int = (gint) (filter->shadow * 256.0);
   gint midtone_int = (gint) (filter->midtone * 256.0);
@@ -559,7 +561,7 @@ gst_video_lux_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
   gint cyan_int = (gint) (filter->cyan * 256.0);
   gint blue_int = (gint) (filter->blue * 256.0);
   gint magenta_int = (gint) (filter->magenta * 256.0);
-  gdouble breadth = filter->color_breadth;
+  gint breadth_int = (gint)(filter->color_breadth * 100.0); /* Convert 0.0-1.0 to 0-100 */
 
   /* First pass: apply tone curve and orange brightness using integer arithmetic */
   for (gint y = 0; y < height; y++) {
@@ -579,36 +581,46 @@ gst_video_lux_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
       gint tone_adjustment = apply_tone_curve_int (luminance, black_int, shadow_int, midtone_int, highlight_int, white_int);
 
       /* Apply selective color adjustments */
-      gint orange = calculate_orange_component_int (r, g, b, breadth);
+      gint orange = calculate_orange_component_int (r, g, b, breadth_int);
       gint orange_adjustment = (orange * orange_int * 77) >> 16; /* 0.3 * 256 = 76.8 ≈ 77 */
-      
-      gint red = calculate_red_component_int (r, g, b, breadth);
+
+      gint red = calculate_red_component_int (r, g, b, breadth_int);
       gint red_adjustment = (red * red_int * 77) >> 16;
-      
-      gint yellow = calculate_yellow_component_int (r, g, b, breadth);
+
+      gint yellow = calculate_yellow_component_int (r, g, b, breadth_int);
       gint yellow_adjustment = (yellow * yellow_int * 77) >> 16;
-      
-      gint green = calculate_green_component_int (r, g, b, breadth);
+
+      gint green = calculate_green_component_int (r, g, b, breadth_int);
       gint green_adjustment = (green * green_int * 77) >> 16;
-      
-      gint cyan = calculate_cyan_component_int (r, g, b, breadth);
+
+      gint cyan = calculate_cyan_component_int (r, g, b, breadth_int);
       gint cyan_adjustment = (cyan * cyan_int * 77) >> 16;
-      
-      gint blue = calculate_blue_component_int (r, g, b, breadth);
+
+      gint blue = calculate_blue_component_int (r, g, b, breadth_int);
       gint blue_adjustment = (blue * blue_int * 77) >> 16;
-      
-      gint magenta = calculate_magenta_component_int (r, g, b, breadth);
+
+      gint magenta = calculate_magenta_component_int (r, g, b, breadth_int);
       gint magenta_adjustment = (magenta * magenta_int * 77) >> 16;
 
-      /* Total adjustment - all are already final values, just add them */
+      /* Apply exposure compensation multiplicatively first */
+      gint exp_r = (r * exposure_mult_int) >> 8;
+      gint exp_g = (g * exposure_mult_int) >> 8;
+      gint exp_b = (b * exposure_mult_int) >> 8;
+
+      /* Clamp exposure-compensated values to valid range */
+      exp_r = CLAMP (exp_r, 0, 255);
+      exp_g = CLAMP (exp_g, 0, 255);
+      exp_b = CLAMP (exp_b, 0, 255);
+
+      /* Total adjustment for tone curve and selective colors - applied to exposure-compensated values */
       gint total_adjustment = tone_adjustment + orange_adjustment + red_adjustment +
                                yellow_adjustment + green_adjustment + cyan_adjustment +
                                blue_adjustment + magenta_adjustment;
 
       /* Apply to RGB channels */
-      gint new_r = CLAMP (r + total_adjustment, 0, 255);
-      gint new_g = CLAMP (g + total_adjustment, 0, 255);
-      gint new_b = CLAMP (b + total_adjustment, 0, 255);
+      gint new_r = CLAMP (exp_r + total_adjustment, 0, 255);
+      gint new_g = CLAMP (exp_g + total_adjustment, 0, 255);
+      gint new_b = CLAMP (exp_b + total_adjustment, 0, 255);
 
       out_row[idx] = (guint8) new_r;
       out_row[idx + 1] = (guint8) new_g;
