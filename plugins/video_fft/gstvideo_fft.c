@@ -356,7 +356,7 @@ apply_fft_filter (guint8 *pixels, gint width, gint height, gint stride,
   gdouble boost_start = 0.15;
   gdouble boost_scale = 0.0;
   gdouble boost_range_inv = 0.0;
-  gboolean has_sharp = (sharp_val != 0.0);
+  gboolean has_sharp = fabs(sharp_val) > 1e-6;
   if (has_sharp) {
     sharp_strength = fabs (sharp_val);
     boost_scale = (sharp_strength / 10.0) * 0.5;

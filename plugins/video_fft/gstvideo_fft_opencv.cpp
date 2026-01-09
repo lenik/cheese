@@ -33,17 +33,30 @@ apply_cas_sharpening (guint8 *pixels, gint width, gint height, gint stride,
     }
   }
   
-  /* CAS parameters */
+  /* CAS parameters - effective sharpening */
   gdouble sharp_strength = fabs(sharp_val);
-  gdouble sharpness = (sharp_strength / 10.0) * 0.4;  /* Scale to 0-0.4 range */
-  
-  /* CAS kernel: sharpens while preserving contrast */
-  /* We'll use a simple unsharp mask approach optimized for CAS */
+  gdouble sharpness = (sharp_strength / 10.0) * 20.0;  /* Scale to 0-3.0 range for visible effect */
+
+  /* CAS: Use standard unsharp mask for reliable sharpening */
   Mat blurred;
-  GaussianBlur(input_mat, blurred, Size(0, 0), 1.0);
-  
+  GaussianBlur(input_mat, blurred, Size(0, 0), 3.0);  // Slightly larger blur for better detail extraction
+
+  /* Extract high-frequency detail */
+  Mat detail;
+  subtract(input_mat, blurred, detail);
+  detail.convertTo(detail, CV_32F);
+
+  /* Apply sharpening by amplifying the detail */
+  multiply(detail, sharpness, detail);
+
+  /* Add amplified detail back to original (not blurred) for true sharpening */
+  Mat result_float;
+  input_mat.convertTo(result_float, CV_32F);
+  add(result_float, detail, result_float);
+
+  /* Convert back to 8-bit, clamp to valid range */
   Mat result;
-  addWeighted(input_mat, 1.0 + sharpness, blurred, -sharpness, 0, result);
+  result_float.convertTo(result, CV_8U);
   
   /* Copy back to output */
   for (gint j = 0; j < height; j++) {
@@ -62,14 +75,19 @@ apply_fft_filter_opencv (guint8 *pixels, gint width, gint height, gint stride,
 {
   using namespace cv;
   
-  /* If only sharpening (no blur), use CAS instead of FFT */
-  if (blur_val == 0.0 && sharp_val != 0.0) {
-    apply_cas_sharpening(pixels, width, height, stride, channels, channel_idx, sharp_val);
+  bool has_blur = fabs(blur_val) > 1e-6;
+  bool has_sharp = fabs(sharp_val) > 1e-6;
+  bool no_blur = !has_blur;
+  bool no_sharp = !has_sharp;
+
+  /* If no blur or sharp, return early */
+  if (no_blur && no_sharp) {
     return;
   }
   
-  /* If no blur or sharp, return early */
-  if (blur_val == 0.0 && sharp_val == 0.0) {
+  /* If only sharpening (no blur), use CAS instead of FFT */
+  if (no_blur && has_sharp) {
+    apply_cas_sharpening(pixels, width, height, stride, channels, channel_idx, sharp_val);
     return;
   }
   
@@ -85,9 +103,43 @@ apply_fft_filter_opencv (guint8 *pixels, gint width, gint height, gint stride,
   gint orig_height = height;
   gint scale_factor = 1;
   
-  /* Downsample to 1/4 for blur operations to improve performance */
-  if (blur_val != 0.0) {
-    scale_factor = 4;  /* 1/4 scale = 1/16 area */
+  /* Use fast spatial blur for small blur values */
+  gdouble threshold = 3.0;
+
+  if (fabs(blur_val) < threshold) {
+    /* Fast spatial Gaussian blur for small blur values */
+    gdouble blur_strength = fabs(blur_val);
+    gdouble sigma = 0.1 + (blur_strength / threshold) * 5.0;
+
+    /* Create Mat from input */
+    Mat input_mat(height, width, CV_8UC1);
+    for (gint j = 0; j < height; j++) {
+      guint8 *src_row = pixels + j * stride;
+      guint8 *dst_row = input_mat.ptr<guint8>(j);
+      for (gint i = 0; i < width; i++) {
+        dst_row[i] = src_row[i * channels + channel_idx];
+      }
+    }
+
+    /* Apply fast spatial Gaussian blur */
+    Mat blurred;
+    GaussianBlur(input_mat, blurred, Size(0, 0), sigma);
+
+    /* Copy back to output */
+    for (gint j = 0; j < height; j++) {
+      guint8 *src_row = blurred.ptr<guint8>(j);
+      guint8 *dst_row = pixels + j * stride;
+      for (gint i = 0; i < width; i++) {
+        dst_row[i * channels + channel_idx] = src_row[i];
+      }
+    }
+
+    return;  /* Done with fast spatial blur */
+  }
+
+  /* Use FFT blur for larger blur values with downsampling */
+  if (fabs(blur_val) >= threshold) {
+    scale_factor = 4; 
     width = width / scale_factor;
     height = height / scale_factor;
   }
@@ -177,15 +229,22 @@ apply_fft_filter_opencv (guint8 *pixels, gint width, gint height, gint stride,
   gdouble inv_max_freq = 1.0 / max_freq;
   
   gdouble sigma = 0.0;
-  gboolean has_blur = (blur_val != 0.0);
   if (has_blur) {
     gdouble blur_strength = fabs(blur_val);
     gdouble sigma_val = 0.1 + (blur_strength / 10.0) * 0.7;
     sigma = 2.0 * sigma_val * sigma_val;
   }
   
-  /* Note: Sharpening is now handled by CAS, so we skip FFT-based sharpening */
-  gboolean has_sharp = FALSE;  /* Disable FFT sharpening - use CAS instead */
+  /* Enable FFT-based sharpening */
+  gdouble sharp_strength = 0.0;
+  gdouble boost_start = 0.15;
+  gdouble boost_scale = 0.0;
+  gdouble boost_range_inv = 0.0;
+  if (has_sharp) {
+    sharp_strength = fabs(sharp_val);
+    boost_scale = (sharp_strength / 10.0) * 0.5;
+    boost_range_inv = 1.0 / (1.0 - boost_start);
+  }
   
   /* Split into real and imaginary planes */
   split(complex_mat, planes);
@@ -245,8 +304,13 @@ apply_fft_filter_opencv (guint8 *pixels, gint width, gint height, gint stride,
           response = 0.9 + 0.1 * (normalized_freq * inv_0_1) * response;
         }
       }
-      
-      /* Sharpening is handled by CAS, not FFT */
+
+      if (has_sharp && normalized_freq > boost_start) {
+        /* Sharpness: smooth high-frequency boost */
+        gdouble boost_factor = 1.0 + boost_scale *
+                               (0.5 + 0.5 * sin(M_PI * (normalized_freq - boost_start) * boost_range_inv));
+        response *= boost_factor;
+      }
       
       real_row[i] *= response;
       imag_row[i] *= response;
