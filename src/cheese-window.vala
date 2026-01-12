@@ -119,7 +119,6 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
   private int button_down_left;
   private int button_down_top;
   private int resize_edge; // 0=move, 1=top-left, 2=top-right, 3=bottom-left, 4=bottom-right (corners only)
-  private uint configure_timeout_id = 0;
 
   /**
    * Responses from the delete files confirmation dialog.
@@ -687,6 +686,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             if (camera != null) {
                 // Use idle callback to ensure layout is complete
                 GLib.Idle.add (() => {
+                    GLib.debug("patching window size for preview on startup");
                     patch_window_size_for_preview ();
                     return false; // Don't repeat
                 });
@@ -1582,37 +1582,32 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
     this.key_release_event.connect (on_key_release);
 
-    // Connect to window state change events for persistence
-    this.configure_event.connect (on_window_configure);
-    this.window_state_event.connect (on_window_state_changed);
-    this.destroy.connect (on_window_destroy);
+    this.delete_event.connect (on_window_delete);
   }
 
-  private void restore_window_state ()
+  public void restore_window_state (bool resize_window = true)
   {
-    // Restore window size and position
-    int width = settings.get_int ("window-width");
-    int height = settings.get_int ("window-height");
-    int x = settings.get_int ("window-left");
-    int y = settings.get_int ("window-top");
-    bool maximized = settings.get_boolean ("window-maximized");
-
-    if (maximized) {
-      this.maximize ();
-    } else {
-      // Clamp size to valid range
-      width = width.clamp (10, 4096);
-      height = height.clamp (10, 4096);
-
-      this.set_default_size (width, height);
-
-      // Only restore position if it's not at the default (0,0) and within reasonable bounds
-      if (x != 0 || y != 0) {
+    int left = settings.get_int ("window-left");
+    int top = settings.get_int ("window-top");
+    
+    // Only restore position if it's not at the default (0,0) and within reasonable bounds
+    if (left != 0 || top != 0) {
         // Check if position is within screen bounds (basic check)
-        if (x >= -1000 && x <= 10000 && y >= -1000 && y <= 10000) {
-          this.move (x, y);
+        if (left >= -1000 && left <= 10000 && top >= -1000 && top <= 10000) {
+            this.move (left, top);
         }
-      }
+    }
+    
+    if (resize_window) {
+        // Restore window size and position
+        int width = settings.get_int ("window-width");
+        int height = settings.get_int ("window-height");
+        
+        // Clamp size to valid range
+        width = width.clamp (10, 4096);
+        height = height.clamp (10, 4096);
+        
+        this.resize (width, height);
     }
 
     // Restore opacity
@@ -1620,59 +1615,46 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     set_opacity (opacity);
   }
 
-  private void save_window_state ()
+  public void resize (int width, int height)
+  {
+    //  stackdump();
+    base.resize(width, height);
+  }
+
+  public void save_window_state ()
   {
     // Save window size, position and maximized state
     bool maximized = this.is_maximized;
     settings.set_boolean ("window-maximized", maximized);
 
-    if (!maximized) {
-      int width, height;
-      this.get_size (out width, out height);
+    int width, height;
+    this.get_size (out width, out height);
 
-      // Clamp values to valid GSettings range
-      width = width.clamp (10, 4096);
-      height = height.clamp (10, 4096);
+    // Clamp values to valid GSettings range
+    width = width.clamp (10, 4096);
+    height = height.clamp (10, 4096);
 
-      settings.set_int ("window-width", width);
-      settings.set_int ("window-height", height);
+    settings.set_int ("window-width", width);
+    settings.set_int ("window-height", height);
 
-      // Save window position
-      int x, y;
-      this.get_position (out x, out y);
-      settings.set_int ("window-left", x);
-      settings.set_int ("window-top", y);
-    }
+    // Save window position
+    int left, top;
+    this.get_position (out left, out top);
+    settings.set_int ("window-left", left);
+    settings.set_int ("window-top", top);
 
     // Save opacity
-    settings.set_double ("opacity", get_opacity ());
+    double opacity = get_opacity ();
+    settings.set_double ("opacity", opacity);
   }
 
-  private bool on_window_configure (Gdk.EventConfigure event)
+  private bool on_window_delete (Gdk.Event event)
   {
-    // Save window state when configured (resized/moved)
-    // Use idle callback to avoid excessive saves during resize
-    if (configure_timeout_id == 0) {
-      configure_timeout_id = GLib.Timeout.add (500, () => {
-        save_window_state ();
-        configure_timeout_id = 0;
-        return false;
-      });
-    }
-    return false;
-  }
-
-  private bool on_window_state_changed (Gdk.EventWindowState event)
-  {
-    // Save window state when maximized/minimized state changes
+    // Save final window state before the window is destroyed
     save_window_state ();
-    return false;
-  }
 
-  private void on_window_destroy ()
-  {
-    // Save final window state on destroy
-    save_window_state ();
+    // Return false to allow the window to be destroyed
+    return false;
   }
 
     public Clutter.Actor get_video_preview ()
@@ -1917,6 +1899,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         }
         
         double value_step = 0.01;
+        double direction = 1.0;
         double current_value;
         switch (mode) {
             case 'h':
@@ -1924,15 +1907,19 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 break;
             case 's':
                 current_value = settings.get_double ("saturation");
+                direction = -1.0;
                 break;
             case 'c':
                 current_value = settings.get_double ("contrast");
+                direction = -1.0;
                 break;
             case 'b':
                 current_value = settings.get_double ("brightness");
+                direction = -1.0;
                 break;
             case 'l':
                 current_value = settings.get_double ("lux");
+                direction = -1.0;
                 break;
             case 'z':
                 current_value = settings.get_double ("canvas-zoom");
@@ -1954,19 +1941,19 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                     if (event.get_scroll_deltas (out _delta_x, out delta_y)) {
                         // Use vertical delta (delta_y) for value change
                         if (delta_y < 0)
-                            new_value = current_value - value_step;
+                            new_value = current_value - value_step * direction;
                         else
-                            new_value = current_value + value_step;
+                            new_value = current_value + value_step * direction;
                         break;
                     }
                 }
                 return false;
             default:
                 if (event.direction == Gdk.ScrollDirection.UP) {
-                    new_value = current_value - value_step;
+                    new_value = current_value - value_step * direction;
                     break;
                 } else if (event.direction == Gdk.ScrollDirection.DOWN) {
-                    new_value = current_value + value_step;
+                    new_value = current_value + value_step * direction;
                     break;
                 }
                 return false;

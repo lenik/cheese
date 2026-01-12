@@ -67,6 +67,8 @@ public class Cheese.Application : Gtk.Application
 
     private static int init_width = 0;
     private static int init_height = 0;
+    private static bool restore_window_enabled;
+
     private static int auto_follow_interval = 0;
     private static int auto_follow_dx = 10;
     private static int auto_follow_dy = 10;
@@ -123,6 +125,8 @@ public class Cheese.Application : Gtk.Application
           N_("Where to save the captured photos"), N_("PATH") },
         { "shoot-interval", 'i', 0, OptionArg.INT, ref auto_shoot_interval,
           N_("Specify the shoot interval (implied --auto), default 1000 (ms)"), N_("INTERVAL") },
+        { "restore-window", 'r', 0, OptionArg.NONE, null,
+          N_("Restore window state on startup"), null },
         { null }
     };
 
@@ -221,7 +225,7 @@ public class Cheese.Application : Gtk.Application
     protected override int command_line (ApplicationCommandLine cl)
     {
         var opts = cl.get_options_dict ();
-
+        
         if (opts.lookup ("device", "^ay", out device, null))
         {
             settings.set_string ("camera", device);
@@ -266,22 +270,28 @@ public class Cheese.Application : Gtk.Application
             if (init_height != 0)
                 init_height = init_height.clamp (10, 4096);
 
-            int width, height;
-            main_window.get_size(out width, out height);
-            if (init_width != 0)
-                width = init_width;
-            if (init_height != 0)
-                height = init_height;
-            main_window.resize(width, height);
+            GLib.Idle.add (() => {
+                int width, height;
 
-            // Save the command-line specified size to settings
-            var settings = new GLib.Settings ("org.gnome.Cheese");
-            settings.set_int ("window-width", width);
-            settings.set_int ("window-height", height);
+                main_window.get_size(out width, out height);
+                if (init_width != 0)
+                    width = init_width;
+                if (init_height != 0)
+                    height = init_height;
+                
+                main_window.resize(width, height);
+                return false; // Don't repeat
+            });
         }
 
-        main_window.restore_window_state ();
-        
+        restore_window_enabled = opts.contains ("restore-window");
+        if (restore_window_enabled) {
+            GLib.Idle.add (() => {
+                main_window.restore_window_state (init_width == 0 || init_height == 0);
+                return false; // Don't repeat
+            });
+        }
+
         auto_follow_enabled = opts.contains ("follow");
         auto_shoot_enabled = opts.contains ("auto") || auto_shoot_interval != 0;
         
@@ -917,6 +927,8 @@ public class Cheese.Application : Gtk.Application
      */
     private void on_quit ()
     {
+        // Save window state before destroying (since destroy bypasses delete-event)
+        main_window.save_window_state ();
         main_window.destroy ();
     }
 
