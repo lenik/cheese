@@ -1,0 +1,7 @@
+{
+    "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
+    "mesonbuild.configureOnOpen": true,
+    "C_Cpp.default.compileCommands": "/home/github/cheese/builddir/compile_commands.json",
+    "postman.settings.dotenv-detection-notification-visibility": false,
+    "CodeGPT.apiKey": "Ollama"
+}

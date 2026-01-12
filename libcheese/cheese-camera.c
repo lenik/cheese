@@ -2382,14 +2382,14 @@ cheese_camera_set_fft_sharp (CheeseCamera *camera, gdouble value)
 }
 
 /**
- * cheese_camera_set_canvas_scale:
+ * cheese_camera_set_canvas_zoom:
  * @camera: A #CheeseCamera
- * @value: scale value to be set (1.0 = no scaling)
+ * @value: zoom value to be set (1.0 = no scaling)
  *
- * Set the canvas scale value on the @camera.
+ * Set the canvas zoom value on the @camera.
  */
 void
-cheese_camera_set_canvas_scale (CheeseCamera *camera, gdouble value)
+cheese_camera_set_canvas_zoom (CheeseCamera *camera, gdouble value)
 {
   CheeseCameraPrivate *priv;
 
@@ -2397,12 +2397,12 @@ cheese_camera_set_canvas_scale (CheeseCamera *camera, gdouble value)
 
   priv = cheese_camera_get_instance_private (camera);
 
-  /* Set scale on both canvases - inactive canvas will ignore it */
+  /* Set zoom on both canvases - inactive canvas will ignore it */
   if (GST_IS_ELEMENT (priv->video_canvas_before))
-    g_object_set (G_OBJECT (priv->video_canvas_before), "scale", value, NULL);
+    g_object_set (G_OBJECT (priv->video_canvas_before), "zoom", value, NULL);
 
   if (GST_IS_ELEMENT (priv->video_canvas_after))
-    g_object_set (G_OBJECT (priv->video_canvas_after), "scale", value, NULL);
+    g_object_set (G_OBJECT (priv->video_canvas_after), "zoom", value, NULL);
 }
 
 /**

@@ -43,7 +43,7 @@ namespace Cheese
     public bool                        has_camera ();
     public void                        play ();
     public void                        set_balance_property (string property, double value);
-    public void                        set_canvas_scale (double value);
+    public void                        set_canvas_zoom (double value);
     public void                        set_canvas_rotation (double value);
     public void                        set_canvas_pan_x (double value);
     public void                        set_canvas_pan_y (double value);

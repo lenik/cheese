@@ -75,3 +75,4 @@ Makefile.in*
 /intltool*.in
 /libtool
 /stamp-h1
+/debian

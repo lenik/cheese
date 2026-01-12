@@ -119,6 +119,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
   private int button_down_left;
   private int button_down_top;
   private int resize_edge; // 0=move, 1=top-left, 2=top-right, 3=bottom-left, 4=bottom-right (corners only)
+  private uint configure_timeout_id = 0;
 
   /**
    * Responses from the delete files confirmation dialog.
@@ -147,6 +148,35 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         this.set_title (title);
     }
 
+    private double get_opacity ()
+    {
+      return this.opacity;
+    }
+  
+    private void set_opacity (double opacity)
+    {
+      // Clamp opacity to valid range
+      opacity = opacity.clamp (0.01, 1.0);
+  
+      // Set window opacity
+      this.opacity = opacity;
+  
+      // Set opacity on Clutter actors
+      uint8 clutter_opacity = (uint8)(opacity * 255.0);
+      if (viewport != null) {
+        viewport.opacity = clutter_opacity;
+      }
+      if (background_layer != null) {
+        background_layer.opacity = clutter_opacity;
+      }
+      if (video_preview != null) {
+        video_preview.opacity = clutter_opacity;
+      }
+  
+      // Save to settings
+      settings.set_double ("opacity", opacity);
+    }
+  
     private bool on_window_state_change_event (Gtk.Widget widget,
                                                Gdk.EventWindowState event)
     {
@@ -1551,6 +1581,98 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     setup_effects_selector ();
 
     this.key_release_event.connect (on_key_release);
+
+    // Connect to window state change events for persistence
+    this.configure_event.connect (on_window_configure);
+    this.window_state_event.connect (on_window_state_changed);
+    this.destroy.connect (on_window_destroy);
+  }
+
+  private void restore_window_state ()
+  {
+    // Restore window size and position
+    int width = settings.get_int ("window-width");
+    int height = settings.get_int ("window-height");
+    int x = settings.get_int ("window-left");
+    int y = settings.get_int ("window-top");
+    bool maximized = settings.get_boolean ("window-maximized");
+
+    if (maximized) {
+      this.maximize ();
+    } else {
+      // Clamp size to valid range
+      width = width.clamp (10, 4096);
+      height = height.clamp (10, 4096);
+
+      this.set_default_size (width, height);
+
+      // Only restore position if it's not at the default (0,0) and within reasonable bounds
+      if (x != 0 || y != 0) {
+        // Check if position is within screen bounds (basic check)
+        if (x >= -1000 && x <= 10000 && y >= -1000 && y <= 10000) {
+          this.move (x, y);
+        }
+      }
+    }
+
+    // Restore opacity
+    double opacity = settings.get_double ("opacity");
+    set_opacity (opacity);
+  }
+
+  private void save_window_state ()
+  {
+    // Save window size, position and maximized state
+    bool maximized = this.is_maximized;
+    settings.set_boolean ("window-maximized", maximized);
+
+    if (!maximized) {
+      int width, height;
+      this.get_size (out width, out height);
+
+      // Clamp values to valid GSettings range
+      width = width.clamp (10, 4096);
+      height = height.clamp (10, 4096);
+
+      settings.set_int ("window-width", width);
+      settings.set_int ("window-height", height);
+
+      // Save window position
+      int x, y;
+      this.get_position (out x, out y);
+      settings.set_int ("window-left", x);
+      settings.set_int ("window-top", y);
+    }
+
+    // Save opacity
+    settings.set_double ("opacity", get_opacity ());
+  }
+
+  private bool on_window_configure (Gdk.EventConfigure event)
+  {
+    // Save window state when configured (resized/moved)
+    // Use idle callback to avoid excessive saves during resize
+    if (configure_timeout_id == 0) {
+      configure_timeout_id = GLib.Timeout.add (500, () => {
+        save_window_state ();
+        configure_timeout_id = 0;
+        return false;
+      });
+    }
+    return false;
+  }
+
+  private bool on_window_state_changed (Gdk.EventWindowState event)
+  {
+    // Save window state when maximized/minimized state changes
+    save_window_state ();
+    return false;
+  }
+
+  private void on_window_destroy ()
+  {
+    // Save final window state on destroy
+    save_window_state ();
   }
 
     public Clutter.Actor get_video_preview ()
@@ -1750,6 +1872,9 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         bool shift_pressed = (event.state & Gdk.ModifierType.SHIFT_MASK) != 0;
         bool win_pressed = (event.state & Gdk.ModifierType.SUPER_MASK) != 0;
 
+        // Check if middle mouse button is pressed (button 2)
+        bool middle_button_pressed = (event.state & Gdk.ModifierType.BUTTON2_MASK) != 0;
+
         int mode = (win_pressed ? 0x1000 : 0)
                 | (alt_pressed ? 0x0100 : 0)
                 | (ctrl_pressed ? 0x0010 : 0)
@@ -1773,9 +1898,13 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 mode = 'b'; // brightness
                 break;
             default:
-                mode = 'o'; // opacity
-                if (!is_borderless)
-                    return false;
+                if (middle_button_pressed) {
+                    mode = 'z'; // zoom
+                } else {
+                    mode = 'o'; // opacity
+                    if (!is_borderless)
+                        return false;
+                }
                 break;
         }
 
@@ -1805,8 +1934,12 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             case 'l':
                 current_value = settings.get_double ("lux");
                 break;
+            case 'z':
+                current_value = settings.get_double ("canvas-zoom");
+                value_step = 0.05; // Larger step for zoom
+                break;
             default:
-                current_value = this.opacity;
+                current_value = get_opacity ();
                 break;
         }
 
@@ -1874,35 +2007,18 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 settings.set_double ("lux", new_value);
                 GLib.debug("lux: %.2f", new_value);
                 break;
+
+            case 'z':
+                new_value = new_value.clamp (0.1, 10.0);
+                camera.set_canvas_zoom (new_value);
+                settings.set_double ("canvas-zoom", new_value);
+                GLib.debug("canvas: zoom %.2f", new_value);
+                break;
             
             default:
             case 'o':
-                // Clamp opacity between 0.01 and 1.0
-                new_value = new_value.clamp (0.01, 1.0);
-                
-                // Apply opacity to window
-                this.opacity = new_value;
-                
-                // Also set opacity on Clutter actors so camera preview respects opacity
-                // Clutter uses 0-255 range, GTK window uses 0.0-1.0 range
-                uint8 clutter_opacity = (uint8)(new_value * 255.0);
-                
-                // GStreamer video textures ignore Clutter actor opacity, so we rely on window opacity
-                // Window opacity should make everything transparent, including Clutter content
-                // Set opacity on the Clutter stage to match window opacity (though it may not work for video)
-                if (viewport != null) {
-                    viewport.opacity = clutter_opacity;
-                }
-                
-                // set background layer opacity
-                if (background_layer != null) {
-                    background_layer.opacity = clutter_opacity;
-                }
-                
-                // Also set opacity on the video preview actor itself
-                if (video_preview != null) {
-                    video_preview.opacity = clutter_opacity;
-                }
+                // Set opacity using the setter method (which handles clamping, Clutter actors, and saving)
+                set_opacity (new_value);
 
                 GLib.debug("opacity: %.2f", new_value);
                 break;
@@ -2166,31 +2282,35 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 return false;
             
             // Reset to default values
-            double default_brightness = 0.0;
+            double default_opacity = 1.0;
+
             double default_contrast = 1.0;
             double default_hue = 0.0;
             double default_saturation = 1.0;
+            double default_brightness = 0.0;
+            
+            double default_canvas_zoom = 1.0;
+            double default_canvas_rotation = 0.0;
+            double default_canvas_pan_x = 0.0;
+            double default_canvas_pan_y = 0.0;
+            
             double default_lux = 0.0;
             double default_lux_black = 0.0;
             double default_lux_shadow = 0.0;
             double default_lux_midtone = 0.0;
             double default_lux_highlight = 0.0;
             double default_lux_white = 0.0;
-            double default_lux_orange = 0.0;
             double default_lux_red = 0.0;
+            double default_lux_orange = 0.0;
             double default_lux_yellow = 0.0;
             double default_lux_green = 0.0;
             double default_lux_cyan = 0.0;
             double default_lux_blue = 0.0;
             double default_lux_magenta = 0.0;
             double default_lux_color_breadth = 0.3;
+            
             double default_fft_blur = 0.0;
             double default_fft_sharp = 0.0;
-            double default_canvas_scale = 1.0;
-            double default_canvas_rotation = 0.0;
-            double default_canvas_pan_x = 0.0;
-            double default_canvas_pan_y = 0.0;
-            double default_opacity = 1.0;
             
             bool canvas_before_balance = camera.get_canvas_before_balance ();
 
@@ -2201,7 +2321,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             camera.set_balance_property ("saturation", default_saturation);
             
             if (canvas_before_balance) {
-                camera.set_canvas_scale (default_canvas_scale);
+                camera.set_canvas_zoom (default_canvas_zoom);
                 camera.set_canvas_rotation (default_canvas_rotation);
                 camera.set_canvas_pan_x (default_canvas_pan_x);
                 camera.set_canvas_pan_y (default_canvas_pan_y);
@@ -2216,8 +2336,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             camera.set_lux_midtone (default_lux_midtone);
             camera.set_lux_highlight (default_lux_highlight);
             camera.set_lux_white (default_lux_white);
-            camera.set_lux_orange (default_lux_orange);
             camera.set_lux_red (default_lux_red);
+            camera.set_lux_orange (default_lux_orange);
             camera.set_lux_yellow (default_lux_yellow);
             camera.set_lux_green (default_lux_green);
             camera.set_lux_cyan (default_lux_cyan);
@@ -2232,10 +2352,12 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             settings.set_double ("contrast", default_contrast);
             settings.set_double ("hue", default_hue);
             settings.set_double ("saturation", default_saturation);
-            settings.set_double ("canvas-scale", default_canvas_scale);
+            
+            settings.set_double ("canvas-zoom", default_canvas_zoom);
             settings.set_double ("canvas-rotation", default_canvas_rotation);
             settings.set_double ("canvas-pan-x", default_canvas_pan_x);
             settings.set_double ("canvas-pan-y", default_canvas_pan_y);
+
             settings.set_double ("lux", default_lux);
             settings.set_double ("lux-black", default_lux_black);
             settings.set_double ("lux-shadow", default_lux_shadow);
@@ -2250,23 +2372,12 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
             settings.set_double ("lux-blue", default_lux_blue);
             settings.set_double ("lux-magenta", default_lux_magenta);
             settings.set_double ("lux-color-breadth", default_lux_color_breadth);
+
             settings.set_double ("fft-blur", default_fft_blur);
             settings.set_double ("fft-sharp", default_fft_sharp);
             
             // Reset opacity
-            this.opacity = default_opacity;
-            
-            // Also set opacity on Clutter actors
-            uint8 clutter_opacity = (uint8)(default_opacity * 255.0);
-            if (viewport != null) {
-                viewport.opacity = clutter_opacity;
-            }
-            if (background_layer != null) {
-                background_layer.opacity = clutter_opacity;
-            }
-            if (video_preview != null) {
-                video_preview.opacity = clutter_opacity;
-            }
+            set_opacity (default_opacity);
             return true;
         }
         
@@ -2280,28 +2391,6 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         int key_class = 0; // c for canvas, l for lux, f for fft
 
         switch (keyval_lower) {
-            case Gdk.Key.plus:
-            case Gdk.Key.equal:
-                // Scale up
-                current_value = settings.get_double ("canvas-scale");
-                new_value = current_value + 0.05;
-                new_value = new_value.clamp (0.1, 10.0);
-                camera.set_canvas_scale (new_value);
-                settings.set_double ("canvas-scale", new_value);
-                key_class = 'c';
-                break;
-
-            case Gdk.Key.minus:
-            case Gdk.Key.underscore:
-                // Scale down
-                current_value = settings.get_double ("canvas-scale");
-                new_value = current_value - 0.05;
-                new_value = new_value.clamp (0.1, 10.0);
-                camera.set_canvas_scale (new_value);
-                settings.set_double ("canvas-scale", new_value);
-                key_class = 'c';
-                break;
-
             case Gdk.Key.Left:
                 if (ctrl_pressed) {
                     // Rotate clockwise 90 degrees
@@ -2367,7 +2456,16 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 break;
 
             case Gdk.Key.Up:
-                if (no_modifier) {
+                if (shift_pressed) {
+                    // Zoom in (shift + up)
+                    current_value = settings.get_double ("canvas-zoom");
+                    new_value = current_value + 0.05;
+                    new_value = new_value.clamp (0.1, 10.0);
+                    camera.set_canvas_zoom (new_value);
+                    settings.set_double ("canvas-zoom", new_value);
+                    key_class = 'c';
+                    break;
+                } else if (no_modifier) {
                     // Pan up (move view down, so pan_y decreases)
                     current_value = settings.get_double ("canvas-pan-y");
                     new_value = current_value - 10.0;
@@ -2379,12 +2477,33 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 break;
 
             case Gdk.Key.Down:
-                if (no_modifier) {
+                if (shift_pressed) {
+                    // Zoom out (shift + down)
+                    current_value = settings.get_double ("canvas-zoom");
+                    new_value = current_value - 0.05;
+                    new_value = new_value.clamp (0.1, 10.0);
+                    camera.set_canvas_zoom (new_value);
+                    settings.set_double ("canvas-zoom", new_value);
+                    key_class = 'c';
+                    break;
+                } else if (no_modifier) {
                     // Pan down (move view up, so pan_y increases)
                     current_value = settings.get_double ("canvas-pan-y");
                     new_value = current_value + 10.0;
                     camera.set_canvas_pan_y (new_value);
                     settings.set_double ("canvas-pan-y", new_value);
+                    key_class = 'c';
+                    break;
+                }
+                break;
+
+            case Gdk.Key.Home:
+                if (shift_pressed) {
+                    // Reset zoom (shift + home)
+                    current_value = settings.get_double ("canvas-zoom");
+                    new_value = 1.0;
+                    camera.set_canvas_zoom (new_value);
+                    settings.set_double ("canvas-zoom", new_value);
                     key_class = 'c';
                     break;
                 }
@@ -2401,58 +2520,134 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 }
                 break;
 
-            case '1': // black: 1+ increase, !- decrease
-            case '!':
+            case '1': // black: 1+ increase, !- decrease, ctrl+1 reset
+                if (ctrl_pressed) {
+                    current_value = settings.get_double ("lux-black");
+                    new_value = 0.0;
+                    camera.set_lux_black (new_value);
+                    settings.set_double ("lux-black", new_value);
+                    key_class = 'l';
+                    break;
+                }
                 current_value = settings.get_double ("lux-black");
-                new_value = (keyval == '1') ? current_value + step : current_value - step;
+                new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_black (new_value);
                 settings.set_double ("lux-black", new_value);
                 key_class = 'l';
                 break;
-            case '2': // shadow: 2+ increase, @- decrease
-            case '@':
+            case '!':
+                current_value = settings.get_double ("lux-black");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_black (new_value);
+                settings.set_double ("lux-black", new_value);
+                key_class = 'l';
+                break;
+            case '2': // shadow: 2+ increase, @- decrease, ctrl+2 reset
+                if (ctrl_pressed) {
+                    current_value = settings.get_double ("lux-shadow");
+                    new_value = 0.0;
+                    camera.set_lux_shadow (new_value);
+                    settings.set_double ("lux-shadow", new_value);
+                    key_class = 'l';
+                    break;
+                }
                 current_value = settings.get_double ("lux-shadow");
-                new_value = (keyval == '2') ? current_value + step : current_value - step;
+                new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_shadow (new_value);
                 settings.set_double ("lux-shadow", new_value);
                 key_class = 'l';
                 break;
-            case '3': // midtone: 3+ increase, #- decrease
-            case '#':
+            case '@':
+                current_value = settings.get_double ("lux-shadow");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_shadow (new_value);
+                settings.set_double ("lux-shadow", new_value);
+                key_class = 'l';
+                break;
+            case '3': // midtone: 3+ increase, #- decrease, ctrl+3 reset
+                if (ctrl_pressed) {
+                    current_value = settings.get_double ("lux-midtone");
+                    new_value = 0.0;
+                    camera.set_lux_midtone (new_value);
+                    settings.set_double ("lux-midtone", new_value);
+                    key_class = 'l';
+                    break;
+                }
                 current_value = settings.get_double ("lux-midtone");
-                new_value = (keyval == '3') ? current_value + step : current_value - step;
+                new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_midtone (new_value);
                 settings.set_double ("lux-midtone", new_value);
                 key_class = 'l';
                 break;
-            case '4': // highlight: 4+ increase, $- decrease
-            case '$':
+            case '#':
+                current_value = settings.get_double ("lux-midtone");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_midtone (new_value);
+                settings.set_double ("lux-midtone", new_value);
+                key_class = 'l';
+                break;
+            case '4': // highlight: 4+ increase, $- decrease, ctrl+4 reset
+                if (ctrl_pressed) {
+                    current_value = settings.get_double ("lux-highlight");
+                    new_value = 0.0;
+                    camera.set_lux_highlight (new_value);
+                    settings.set_double ("lux-highlight", new_value);
+                    key_class = 'l';
+                    break;
+                }
                 current_value = settings.get_double ("lux-highlight");
-                new_value = (keyval == '4') ? current_value + step : current_value - step;
+                new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_highlight (new_value);
                 settings.set_double ("lux-highlight", new_value);
                 key_class = 'l';
                 break;
-            case '5': // white: 5+ increase, %- decrease
-            case '%':
+            case '$':
+                current_value = settings.get_double ("lux-highlight");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_highlight (new_value);
+                settings.set_double ("lux-highlight", new_value);
+                key_class = 'l';
+                break;
+            case '5': // white: 5+ increase, %- decrease, ctrl+5 reset
+                if (ctrl_pressed) {
+                    current_value = settings.get_double ("lux-white");
+                    new_value = 0.0;
+                    camera.set_lux_white (new_value);
+                    settings.set_double ("lux-white", new_value);
+                    key_class = 'l';
+                    break;
+                }
                 current_value = settings.get_double ("lux-white");
-                new_value = (keyval == '5') ? current_value + step : current_value - step;
+                new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_white (new_value);
                 settings.set_double ("lux-white", new_value);
                 key_class = 'l';
                 break;
+            case '%':
+                current_value = settings.get_double ("lux-white");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_white (new_value);
+                settings.set_double ("lux-white", new_value);
+                key_class = 'l';
+                break;
+
             case 'r': // red: r+ increase, R- decrease
                 current_value = settings.get_double ("lux-red");
                 new_value = shift_pressed ? current_value - step : current_value + step;
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_red (new_value);
                 settings.set_double ("lux-red", new_value);
-                key_class = 'l';
+                key_class = 'L';
                 break;
             case 'o': // orange: o+ increase, O- decrease
                 current_value = settings.get_double ("lux-orange");
@@ -2460,7 +2655,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_orange (new_value);
                 settings.set_double ("lux-orange", new_value);
-                key_class = 'l';
+                key_class = 'L';
                 break;
             case 'y': // yellow: y+ increase, Y- decrease
                 current_value = settings.get_double ("lux-yellow");
@@ -2468,7 +2663,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_yellow (new_value);
                 settings.set_double ("lux-yellow", new_value);
-                key_class = 'l';
+                key_class = 'L';
                 break;
             case 'g': // green: g+ increase, G- decrease
                 current_value = settings.get_double ("lux-green");
@@ -2476,7 +2671,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_green (new_value);
                 settings.set_double ("lux-green", new_value);
-                key_class = 'l';
+                key_class = 'L';
                 break;
             case 'c': // cyan: c+ increase, C- decrease
                 current_value = settings.get_double ("lux-cyan");
@@ -2484,7 +2679,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_cyan (new_value);
                 settings.set_double ("lux-cyan", new_value);
-                key_class = 'l';
+                key_class = 'L';
                 break;
             case 'b': // blue: b+ increase, B- decrease (note: blur uses different key)
                 current_value = settings.get_double ("lux-blue");
@@ -2492,7 +2687,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_blue (new_value);
                 settings.set_double ("lux-blue", new_value);
-                key_class = 'l';
+                key_class = 'L';
                 break;
             case 'm': // magenta: m+ increase, M- decrease
                 current_value = settings.get_double ("lux-magenta");
@@ -2500,31 +2695,183 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 new_value = new_value.clamp (-2.0, 2.0);
                 camera.set_lux_magenta (new_value);
                 settings.set_double ("lux-magenta", new_value);
+                key_class = 'L';
+                break;
+
+            case Gdk.Key.minus: // exposure: - decrease, = increase
+                if (!ctrl_pressed && !alt_pressed && !shift_pressed) {
+                    current_value = settings.get_double ("lux");
+                    new_value = current_value - step;
+                    new_value = new_value.clamp (-10.0, 10.0);
+                    camera.set_lux (new_value);
+                    settings.set_double ("lux", new_value);
+                    key_class = 'l';
+                    break;
+                }
+                // Fall through to contrast if shift is pressed (_)
+                break;
+
+            case Gdk.Key.equal: // exposure: = increase
+                if (!ctrl_pressed && !alt_pressed && !shift_pressed) {
+                    current_value = settings.get_double ("lux");
+                    new_value = current_value + step;
+                    new_value = new_value.clamp (-10.0, 10.0);
+                    camera.set_lux (new_value);
+                    settings.set_double ("lux", new_value);
+                    key_class = 'l';
+                    break;
+                }
+                // Fall through to contrast if shift is pressed (+)
+                break;
+
+            case Gdk.Key.underscore: // contrast: _ decrease
+                if (shift_pressed && keyval_lower == '_') {
+                    current_value = settings.get_double ("contrast");
+                    new_value = current_value - step;
+                    new_value = new_value.clamp (0.0, 1.99);
+                    camera.set_balance_property ("contrast", new_value);
+                    settings.set_double ("contrast", new_value);
+                    key_class = 'b';
+                    break;
+                }
+                break;
+
+            case Gdk.Key.plus: // contrast: + increase
+                if (shift_pressed && keyval_lower == '+') {
+                    current_value = settings.get_double ("contrast");
+                    new_value = current_value + step;
+                    new_value = new_value.clamp (0.0, 1.99);
+                    camera.set_balance_property ("contrast", new_value);
+                    settings.set_double ("contrast", new_value);
+                    key_class = 'b';
+                    break;
+                }
+                break;
+
+            case Gdk.Key.BackSpace: // reset exposure, shift+backspace reset contrast
+                if (shift_pressed) {
+                    // Reset contrast
+                    current_value = settings.get_double ("contrast");
+                    new_value = 1.0;
+                    camera.set_balance_property ("contrast", new_value);
+                    settings.set_double ("contrast", new_value);
+                    key_class = 'b';
+                    break;
+                } else {
+                    // Reset exposure
+                    current_value = settings.get_double ("lux");
+                    new_value = 0.0;
+                    camera.set_lux (new_value);
+                    settings.set_double ("lux", new_value);
+                    key_class = 'l';
+                    break;
+                }
+
+            case '[': // luminance: [ decrease
+                current_value = settings.get_double ("lux-midtone");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_midtone (new_value);
+                settings.set_double ("lux-midtone", new_value);
                 key_class = 'l';
                 break;
-            case '9': // exposure: 9+ increase, (- decrease
-            case '(':
-                current_value = settings.get_double ("lux");
-                new_value = (keyval == '9') ? current_value + step : current_value - step;
-                new_value = new_value.clamp (-10.0, 10.0);
-                camera.set_lux (new_value);
-                settings.set_double ("lux", new_value);
+            case ']': // luminance: ] increase
+                current_value = settings.get_double ("lux-midtone");
+                new_value = current_value + step;
+                new_value = new_value.clamp (-2.0, 2.0);
+                camera.set_lux_midtone (new_value);
+                settings.set_double ("lux-midtone", new_value);
                 key_class = 'l';
                 break;
-            case 'u': // blur: u+ increase, U- decrease (changed from 'b' to avoid conflict with blue)
-                current_value = settings.get_double ("fft-blur");
-                new_value = shift_pressed ? current_value - step : current_value + step;
-                new_value = new_value.clamp (-10.0, 10.0);
-                camera.set_fft_blur (new_value);
-                settings.set_double ("fft-blur", new_value);
-                key_class = 'f';
+            case '\\': // reset luminance
+                current_value = settings.get_double ("lux-midtone");
+                new_value = 0.0;
+                camera.set_lux_midtone (new_value);
+                settings.set_double ("lux-midtone", new_value);
+                key_class = 'l';
                 break;
-            case 's': // sharp: s+ increase, S- decrease
-                current_value = settings.get_double ("fft-sharp");
-                new_value = shift_pressed ? current_value - step : current_value + step;
-                new_value = new_value.clamp (-10.0, 10.0);
-                camera.set_fft_sharp (new_value);
-                settings.set_double ("fft-sharp", new_value);
+            case '{': // saturation: { decrease
+                current_value = settings.get_double ("saturation");
+                new_value = current_value - step;
+                new_value = new_value.clamp (0.0, 2.0);
+                camera.set_balance_property ("saturation", new_value);
+                settings.set_double ("saturation", new_value);
+                key_class = 'b';
+                break;
+            case '}': // saturation: } increase
+                current_value = settings.get_double ("saturation");
+                new_value = current_value + step;
+                new_value = new_value.clamp (0.0, 2.0);
+                camera.set_balance_property ("saturation", new_value);
+                settings.set_double ("saturation", new_value);
+                key_class = 'b';
+                break;
+            case '|': // reset saturation
+                current_value = settings.get_double ("saturation");
+                new_value = 1.0;
+                camera.set_balance_property ("saturation", new_value);
+                settings.set_double ("saturation", new_value);
+                key_class = 'b';
+                break;
+            case '<': // hue: < decrease
+                current_value = settings.get_double ("hue");
+                new_value = current_value - step;
+                new_value = new_value.clamp (-1.0, 1.0);
+                camera.set_balance_property ("hue", new_value);
+                settings.set_double ("hue", new_value);
+                key_class = 'b';
+                break;
+            case '>': // hue: > increase
+                current_value = settings.get_double ("hue");
+                new_value = current_value + step;
+                new_value = new_value.clamp (-1.0, 1.0);
+                camera.set_balance_property ("hue", new_value);
+                settings.set_double ("hue", new_value);
+                key_class = 'b';
+                break;
+            case '?': // reset hue
+                current_value = settings.get_double ("hue");
+                new_value = 0.0;
+                camera.set_balance_property ("hue", new_value);
+                settings.set_double ("hue", new_value);
+                key_class = 'b';
+                break;
+            case '7': // blur/sharp: 7 decreases blur or increases sharp, shift-7 decreases sharp or increases blur, ctrl-7 reset
+                if (ctrl_pressed) {
+                    // Reset both blur and sharp
+                    camera.set_fft_blur (0.0);
+                    settings.set_double ("fft-blur", 0.0);
+                    camera.set_fft_sharp (0.0);
+                    settings.set_double ("fft-sharp", 0.0);
+                    key_class = 'f';
+                    break;
+                }
+                double blur_value = settings.get_double ("fft-blur");
+                double sharp_value = settings.get_double ("fft-sharp");
+
+                if (shift_pressed) {
+                    // shift-7: decrease sharp, or if sharp <= 0, increase blur
+                    if (sharp_value > 0) {
+                        sharp_value = (sharp_value - step).clamp (0, 10.0);
+                        camera.set_fft_sharp (sharp_value);
+                        settings.set_double ("fft-sharp", sharp_value);
+                    } else {
+                        blur_value = (blur_value + step).clamp (0, 10.0);
+                        camera.set_fft_blur (blur_value);
+                        settings.set_double ("fft-blur", blur_value);
+                    }
+                } else {
+                    // 7: decrease blur, or if blur <= 0, increase sharp
+                    if (blur_value > 0) {
+                        blur_value = (blur_value - step).clamp (0, 10.0);
+                        camera.set_fft_blur (blur_value);
+                        settings.set_double ("fft-blur", blur_value);
+                    } else {
+                        sharp_value = (sharp_value + step).clamp (0, 10.0);
+                        camera.set_fft_sharp (sharp_value);
+                        settings.set_double ("fft-sharp", sharp_value);
+                    }
+                }
                 key_class = 'f';
                 break;
             case 'h':
@@ -2535,23 +2882,34 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
                 return true;
         }
         switch (key_class) {
+            case 'b':
+                GLib.debug("balance: contrast %.2f hue %.2f saturation %.2f brightness %.2f",
+                    settings.get_double ("contrast"),
+                    settings.get_double ("hue"),
+                    settings.get_double ("saturation"),
+                    settings.get_double ("brightness"));
+                return true;
             case 'c':
-                GLib.debug("canvas: scale %.2f, rotation %.2f, panx %.2f, pan_y %.2f", 
-                    settings.get_double ("canvas-scale"),
+                GLib.debug("canvas: zoom %.2f, rotation %.2f, panx %.2f, pan_y %.2f",
+                    settings.get_double ("canvas-zoom"),
                     settings.get_double ("canvas-rotation"),
                     settings.get_double ("canvas-pan-x"),
                     settings.get_double ("canvas-pan-y"));
                 return true;
             case 'l':
-                GLib.debug("lux: [%.2f] %.2f %.2f <%.2f> %.2f %.2f, o %.2f, r %.2f, y %.2f, g %.2f, c %.2f, b %.2f, m %.2f",
+                GLib.debug("lux: [%.2f] black %.2f shadow %.2f mid %.2f highlight %.2f white %.2f",
                     settings.get_double ("lux"),
                     settings.get_double ("lux-black"),
                     settings.get_double ("lux-shadow"),
                     settings.get_double ("lux-midtone"),
                     settings.get_double ("lux-highlight"),
-                    settings.get_double ("lux-white"),
-                    settings.get_double ("lux-orange"),
+                    settings.get_double ("lux-white")
+                    );
+                return true;
+            case 'L':
+                GLib.debug("lux: red %.2f orange %.2f yellow %.2f green %.2f cyan %.2f blue %.2f magenta %.2f",
                     settings.get_double ("lux-red"),
+                    settings.get_double ("lux-orange"),
                     settings.get_double ("lux-yellow"),
                     settings.get_double ("lux-green"),
                     settings.get_double ("lux-cyan"),

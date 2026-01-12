@@ -260,6 +260,12 @@ public class Cheese.Application : Gtk.Application
         }
 
         if (init_width != 0 || init_height != 0) {
+            // Clamp command-line values to valid range
+            if (init_width != 0)
+                init_width = init_width.clamp (10, 4096);
+            if (init_height != 0)
+                init_height = init_height.clamp (10, 4096);
+
             int width, height;
             main_window.get_size(out width, out height);
             if (init_width != 0)
@@ -267,8 +273,15 @@ public class Cheese.Application : Gtk.Application
             if (init_height != 0)
                 height = init_height;
             main_window.resize(width, height);
+
+            // Save the command-line specified size to settings
+            var settings = new GLib.Settings ("org.gnome.Cheese");
+            settings.set_int ("window-width", width);
+            settings.set_int ("window-height", height);
         }
 
+        main_window.restore_window_state ();
+        
         auto_follow_enabled = opts.contains ("follow");
         auto_shoot_enabled = opts.contains ("auto") || auto_shoot_interval != 0;
         

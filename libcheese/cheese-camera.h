@@ -139,7 +139,7 @@ void cheese_camera_set_lux_magenta (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_lux_color_breadth (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_fft_blur (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_fft_sharp (CheeseCamera *camera, gdouble value);
-void cheese_camera_set_canvas_scale (CheeseCamera *camera, gdouble value);
+void cheese_camera_set_canvas_zoom (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_rotation (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_pan_x (CheeseCamera *camera, gdouble value);
 void cheese_camera_set_canvas_pan_y (CheeseCamera *camera, gdouble value);

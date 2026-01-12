@@ -48,7 +48,7 @@ struct _GstCanvas
 {
   GstVideoFilter base;
   gboolean active;
-  gdouble scale;
+  gdouble zoom;
   gdouble rotation; /* in degrees */
   gdouble pan_x;    /* pan offset in x direction (in pixels) */
   gdouble pan_y;    /* pan offset in y direction (in pixels) */
@@ -144,7 +144,7 @@ get_pixel_bilinear_int (guint8 *data, gint width, gint height, gint stride,
   }
 }
 
-/* Simple nearest-neighbor for scale-only (faster) */
+/* Simple nearest-neighbor for zoom-only (faster) */
 static inline void
 get_pixel_nearest (guint8 *data, gint width, gint height, gint stride,
                    gint channels, gint x, gint y, guint8 *out)
@@ -172,7 +172,7 @@ gst_canvas_class_init (GstCanvasClass * klass)
       g_param_spec_boolean ("active", "Active", "Whether the canvas effect is active",
           TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_SCALE,
-      g_param_spec_double ("scale", "Scale", "Scale factor (1.0 = no scaling)",
+      g_param_spec_double ("zoom", "Scale", "Scale factor (1.0 = no scaling)",
           0.1, 10.0, DEFAULT_SCALE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_ROTATION,
@@ -190,7 +190,7 @@ gst_canvas_class_init (GstCanvasClass * klass)
 
   gst_element_class_set_static_metadata (gstelement_class,
       "Video Canvas", "Filter/Effect/Video",
-      "Applies scale and rotation transformations to video",
+      "Applies zoom and rotation transformations to video",
       "Cheese");
 
   filter_class->transform_frame =
@@ -206,7 +206,7 @@ static void
 gst_canvas_init (GstCanvas * filter)
 {
   filter->active = TRUE;
-  filter->scale = DEFAULT_SCALE;
+  filter->zoom = DEFAULT_SCALE;
   filter->rotation = DEFAULT_ROTATION;
   filter->pan_x = DEFAULT_PAN_X;
   filter->pan_y = DEFAULT_PAN_Y;
@@ -223,7 +223,7 @@ gst_canvas_set_property (GObject * object, guint prop_id,
       filter->active = g_value_get_boolean (value);
       break;
     case PROP_SCALE:
-      filter->scale = g_value_get_double (value);
+      filter->zoom = g_value_get_double (value);
       break;
     case PROP_ROTATION:
       filter->rotation = g_value_get_double (value);
@@ -251,7 +251,7 @@ gst_canvas_get_property (GObject * object, guint prop_id,
       g_value_set_boolean (value, filter->active);
       break;
     case PROP_SCALE:
-      g_value_set_double (value, filter->scale);
+      g_value_set_double (value, filter->zoom);
       break;
     case PROP_ROTATION:
       g_value_set_double (value, filter->rotation);
@@ -268,17 +268,17 @@ gst_canvas_get_property (GObject * object, guint prop_id,
   }
 }
 
-/* Optimized scale-only path using fixed-point arithmetic */
+/* Optimized zoom-only path using fixed-point arithmetic */
 static void
-transform_scale_only (guint8 *in_data, guint8 *out_data,
+transform_zoom_only (guint8 *in_data, guint8 *out_data,
                       gint width, gint height, gint in_stride, gint out_stride,
-                      gint channels, gdouble scale, gdouble pan_x, gdouble pan_y)
+                      gint channels, gdouble zoom, gdouble pan_x, gdouble pan_y)
 {
   gint center_x = width / 2;
   gint center_y = height / 2;
   
-  /* Convert scale to fixed-point (16.16 format) */
-  gint scale_fixed = (gint)((1.0 / scale) * 65536.0);
+  /* Convert zoom to fixed-point (16.16 format) */
+  gint zoom_fixed = (gint)((1.0 / zoom) * 65536.0);
   gint pan_x_fixed = (gint)(pan_x * 65536.0);
   gint pan_y_fixed = (gint)(pan_y * 65536.0);
   gint center_x_fixed = center_x << 16;
@@ -286,14 +286,14 @@ transform_scale_only (guint8 *in_data, guint8 *out_data,
   
   for (gint y = 0; y < height; y++) {
     guint8 *out_row = out_data + y * out_stride;
-    /* Calculate y_offset: (y - center_y) * (1/scale) */
-    gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+    /* Calculate y_offset: (y - center_y) * (1/zoom) */
+    gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
     
     for (gint x = 0; x < width; x++) {
       gint idx = x * channels;
       
       /* Calculate source coordinates in fixed-point */
-      gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+      gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
       gint src_x_fixed = center_x_fixed + (x_offset << 16) + pan_x_fixed;
       gint src_y_fixed = center_y_fixed + (y_offset << 16) + pan_y_fixed;
       
@@ -306,14 +306,14 @@ transform_scale_only (guint8 *in_data, guint8 *out_data,
 
 /* Optimized path for 90/180/270/360 degree rotations */
 static void
-transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
+transform_zoom_rotation_90deg (guint8 *in_data, guint8 *out_data,
                                 gint width, gint height, gint in_stride, gint out_stride,
-                                gint channels, gdouble scale, gint rotation_deg,
+                                gint channels, gdouble zoom, gint rotation_deg,
                                 gdouble pan_x, gdouble pan_y)
 {
   gint center_x = width / 2;
   gint center_y = height / 2;
-  gint scale_fixed = (gint)((1.0 / scale) * 65536.0);
+  gint zoom_fixed = (gint)((1.0 / zoom) * 65536.0);
   gint pan_x_fixed = (gint)(pan_x * 65536.0);
   gint pan_y_fixed = (gint)(pan_y * 65536.0);
   gint center_x_fixed = center_x << 16;
@@ -329,11 +329,11 @@ transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
       /* No rotation: (x,y) -> (x, y) */
       for (gint y = 0; y < height; y++) {
         guint8 *out_row = out_data + y * out_stride;
-        gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+        gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
         
         for (gint x = 0; x < width; x++) {
           gint idx = x * channels;
-          gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+          gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
           gint src_x_fixed = center_x_fixed + (x_offset << 16) + pan_x_fixed;
           gint src_y_fixed = center_y_fixed + (y_offset << 16) + pan_y_fixed;
           
@@ -347,11 +347,11 @@ transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
       /* Rotate 90: (x,y) -> (-y, x) */
       for (gint y = 0; y < height; y++) {
         guint8 *out_row = out_data + y * out_stride;
-        gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+        gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
         
         for (gint x = 0; x < width; x++) {
           gint idx = x * channels;
-          gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+          gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
           gint src_x_fixed = center_x_fixed + ((-y_offset) << 16) + pan_x_fixed;
           gint src_y_fixed = center_y_fixed + (x_offset << 16) + pan_y_fixed;
           
@@ -365,11 +365,11 @@ transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
       /* Rotate 180: (x,y) -> (-x, -y) */
       for (gint y = 0; y < height; y++) {
         guint8 *out_row = out_data + y * out_stride;
-        gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+        gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
         
         for (gint x = 0; x < width; x++) {
           gint idx = x * channels;
-          gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+          gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
           gint src_x_fixed = center_x_fixed + ((-x_offset) << 16) + pan_x_fixed;
           gint src_y_fixed = center_y_fixed + ((-y_offset) << 16) + pan_y_fixed;
           
@@ -383,11 +383,11 @@ transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
       /* Rotate 270: (x,y) -> (y, -x) */
       for (gint y = 0; y < height; y++) {
         guint8 *out_row = out_data + y * out_stride;
-        gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+        gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
         
         for (gint x = 0; x < width; x++) {
           gint idx = x * channels;
-          gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+          gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
           gint src_x_fixed = center_x_fixed + (y_offset << 16) + pan_x_fixed;
           gint src_y_fixed = center_y_fixed + ((-x_offset) << 16) + pan_y_fixed;
           
@@ -401,11 +401,11 @@ transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
       /* Should not happen, but fallback to no rotation */
       for (gint y = 0; y < height; y++) {
         guint8 *out_row = out_data + y * out_stride;
-        gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+        gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
         
         for (gint x = 0; x < width; x++) {
           gint idx = x * channels;
-          gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+          gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
           gint src_x_fixed = center_x_fixed + (x_offset << 16) + pan_x_fixed;
           gint src_y_fixed = center_y_fixed + (y_offset << 16) + pan_y_fixed;
           
@@ -420,14 +420,14 @@ transform_scale_rotation_90deg (guint8 *in_data, guint8 *out_data,
 
 /* Generic path for arbitrary rotation angles */
 static void
-transform_scale_rotation_generic (guint8 *in_data, guint8 *out_data,
+transform_zoom_rotation_generic (guint8 *in_data, guint8 *out_data,
                                    gint width, gint height, gint in_stride, gint out_stride,
-                                   gint channels, gdouble scale, gdouble rotation,
+                                   gint channels, gdouble zoom, gdouble rotation,
                                    gdouble pan_x, gdouble pan_y)
 {
   gint center_x = width / 2;
   gint center_y = height / 2;
-  gint scale_fixed = (gint)((1.0 / scale) * 65536.0);
+  gint zoom_fixed = (gint)((1.0 / zoom) * 65536.0);
   gint pan_x_fixed = (gint)(pan_x * 65536.0);
   gint pan_y_fixed = (gint)(pan_y * 65536.0);
   gint center_x_fixed = center_x << 16;
@@ -442,11 +442,11 @@ transform_scale_rotation_generic (guint8 *in_data, guint8 *out_data,
   
   for (gint y = 0; y < height; y++) {
     guint8 *out_row = out_data + y * out_stride;
-    gint y_offset = ((y - center_y) * scale_fixed) >> 16;
+    gint y_offset = ((y - center_y) * zoom_fixed) >> 16;
     
     for (gint x = 0; x < width; x++) {
       gint idx = x * channels;
-      gint x_offset = ((x - center_x) * scale_fixed) >> 16;
+      gint x_offset = ((x - center_x) * zoom_fixed) >> 16;
       
       /* Apply inverse rotation using fixed-point arithmetic */
       /* For clockwise rotation, the inverse transform is:
@@ -481,15 +481,15 @@ gst_canvas_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
   }
 
   // floating point comparison
-  gboolean has_scale = fabs(filter->scale - 1.0) > 1e-6;
+  gboolean has_zoom = fabs(filter->zoom - 1.0) > 1e-6;
   gboolean has_rotation = fabs(filter->rotation - 0.0) > 1e-6;
   gboolean has_pan_x = fabs(filter->pan_x - 0.0) > 1e-6;
   gboolean has_pan_y = fabs(filter->pan_y - 0.0) > 1e-6;
-  gboolean no_scale = !has_scale;
+  gboolean no_zoom = !has_zoom;
   gboolean no_rotation = !has_rotation;
   gboolean no_pan_x = !has_pan_x;
   gboolean no_pan_y = !has_pan_y;
-  if (no_scale && no_rotation && no_pan_x && no_pan_y) {
+  if (no_zoom && no_rotation && no_pan_x && no_pan_y) {
     gst_video_frame_copy (outframe, inframe);
     return GST_FLOW_OK;
   }
@@ -518,21 +518,21 @@ gst_canvas_transform_frame (GstVideoFilter * base, GstVideoFrame * inframe,
   gint rotation_deg = (gint)(filter->rotation + 0.5); /* Round to nearest integer */
   
   if (no_rotation) {
-    /* Fastest path: scale-only (no rotation) */
-    transform_scale_only (in_data, out_data, width, height,
+    /* Fastest path: zoom-only (no rotation) */
+    transform_zoom_only (in_data, out_data, width, height,
                          in_stride, out_stride, channels,
-                         filter->scale, filter->pan_x, filter->pan_y);
+                         filter->zoom, filter->pan_x, filter->pan_y);
   } else if (is_90deg_rotation) {
-    /* Optimized path for scale with 90/180/270/360 degree rotations */
-    transform_scale_rotation_90deg (in_data, out_data, width, height,
+    /* Optimized path for zoom with 90/180/270/360 degree rotations */
+    transform_zoom_rotation_90deg (in_data, out_data, width, height,
                                     in_stride, out_stride, channels,
-                                    filter->scale, rotation_deg,
+                                    filter->zoom, rotation_deg,
                                     filter->pan_x, filter->pan_y);
   } else {
     /* General case: use generic function for arbitrary rotation */
-    transform_scale_rotation_generic (in_data, out_data, width, height,
+    transform_zoom_rotation_generic (in_data, out_data, width, height,
                                      in_stride, out_stride, channels,
-                                     filter->scale, filter->rotation,
+                                     filter->zoom, filter->rotation,
                                      filter->pan_x, filter->pan_y);
   }
 

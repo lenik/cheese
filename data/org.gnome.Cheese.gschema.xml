@@ -88,9 +88,9 @@
       <range min='-1' max='1'/>
     </key>
 
-    <key type='d' name='canvas-scale'>
-      <summary>Canvas scale</summary>
-      <description>Scale factor for canvas transformation (1.0 = no scaling)</description>
+    <key type='d' name='canvas-zoom'>
+      <summary>Canvas zoom</summary>
+      <description>Zoom factor for canvas transformation (1.0 = no zoom)</description>
       <default>1.0</default>
       <range min='0.1' max='10.0'/>
     </key>
@@ -226,6 +226,47 @@
       <description>Adjusts the sharpness amount in the FFT effect</description>
       <default>0</default>
       <range min='-10' max='10'/>
+    </key>
+
+    <key type='d' name='opacity'>
+      <summary>Window opacity</summary>
+      <description>Adjusts the transparency of the main window</description>
+      <default>1.0</default>
+      <range min='0.01' max='1.0'/>
+    </key>
+
+    <key type='i' name='window-width'>
+      <summary>Window width</summary>
+      <description>The width of the main window</description>
+      <default>800</default>
+      <range min='10' max='4096'/>
+    </key>
+
+    <key type='i' name='window-height'>
+      <summary>Window height</summary>
+      <description>The height of the main window</description>
+      <default>600</default>
+      <range min='10' max='4096'/>
+    </key>
+
+    <key type='i' name='window-left'>
+      <summary>Window left position</summary>
+      <description>The left (X) position of the main window</description>
+      <default>0</default>
+      <range min='0' max='10000'/>
+    </key>
+
+    <key type='i' name='window-top'>
+      <summary>Window top position</summary>
+      <description>The top (Y) position of the main window</description>
+      <default>0</default>
+      <range min='0' max='10000'/>
+    </key>
+  
+    <key type='b' name='window-maximized'>
+      <summary>Window maximized state</summary>
+      <description>Whether the main window is maximized</description>
+      <default>false</default>
     </key>
 
     <key type='s' name='video-path'>
