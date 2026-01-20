@@ -85,6 +85,7 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     private Clutter.Actor background_layer;
     private Clutter.Text error_layer;
     private Clutter.Text timeout_layer;
+    private Clutter.Actor auto_shoot_indicator;
 
   private Clutter.Actor current_effects_grid;
   private uint current_effects_page = 0;
@@ -171,7 +172,12 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
       if (video_preview != null) {
         video_preview.opacity = clutter_opacity;
       }
-  
+      if (auto_shoot_indicator != null) {
+        // Highlight the indicator based on the window opacity
+        // Use sqrt(opacity) to create a softer highlight effect
+        uint8 highlight = (uint8) (Math.sqrt(opacity) * 255.0);
+        auto_shoot_indicator.opacity = highlight;
+      }
       // Save to settings
       settings.set_double ("opacity", opacity);
     }
@@ -831,6 +837,8 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
     this.background_layer.set_size (viewport.width, viewport.height);
     this.timeout_layer.set_position (video_preview.width/3 + viewport.width/2,
                                 viewport.height-20);
+    // Position auto-shoot indicator in bottom right corner of viewport
+    auto_shoot_indicator.set_position (viewport.width - 25, viewport.height - 25);
   }
 
   /**
@@ -1399,6 +1407,25 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
         }
     }
 
+    /**
+     * Show or hide the auto-shoot indicator.
+     *
+     * @param visible true to show the indicator, false to hide it
+     */
+    public void set_auto_shoot_indicator_visible (bool visible)
+    {
+        if (visible) {
+            auto_shoot_indicator.show();
+            // Ensure canvas is redrawn
+            var canvas = auto_shoot_indicator.get_content() as Clutter.Canvas;
+            if (canvas != null) {
+                canvas.invalidate();
+            }
+        } else {
+            auto_shoot_indicator.hide();
+        }
+    }
+
   /**
    * Select next camera in list and activate it.
    */
@@ -1543,6 +1570,38 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
     viewport.add_child (viewport_layout);
     viewport.add_child (timeout_layer);
+
+    // Create auto-shoot indicator (red dot) - test canvas sizing
+    auto_shoot_indicator = new Clutter.Actor();
+    int size = 16;
+    auto_shoot_indicator.set_size(size, size); // Larger to accommodate border
+    auto_shoot_indicator.hide(); // Initially hidden
+
+    // Create canvas with explicit sizing for circular indicator
+    var canvas = new Clutter.Canvas();
+    canvas.set_size(size, size); // Explicit canvas size
+    auto_shoot_indicator.set_content(canvas);
+
+    // Draw red circle with black border
+    canvas.draw.connect((cr, width, height) => {
+        double center_x = width / 2.0;
+        double center_y = height / 2.0;
+
+        // clear the canvas
+        cr.set_source_rgba(0.0, 0.0, 0.0, 0.0);
+        cr.rectangle(0, 0, width, height);
+        cr.fill();
+
+        // Draw red interior circle
+        cr.set_source_rgba(1.0, 0.0, 0.0, 1.0);
+        cr.arc(center_x, center_y, width/2.0 - 3, 0, 2 * Math.PI);
+        cr.fill();
+
+        return true;
+    });
+    canvas.invalidate();
+
+    viewport.add_child (auto_shoot_indicator);
 
     viewport.allocation_changed.connect (on_stage_resize);
 
@@ -2255,6 +2314,24 @@ public class Cheese.MainWindow : Gtk.ApplicationWindow
 
     private bool on_key_press (Gdk.EventKey event)
     {
+        // Shift+F1: Show keyboard shortcuts window
+        if ((event.state & Gdk.ModifierType.SHIFT_MASK) != 0 && event.keyval == Gdk.Key.F1) {
+            var app = GLib.Application.get_default() as Cheese.Application;
+            if (app != null) {
+                app.on_shortcuts();
+            }
+            return true;
+        }
+
+        // F2: Toggle auto-shoot
+        if (event.keyval == Gdk.Key.F2 && (event.state & Gdk.ModifierType.MODIFIER_MASK) == 0) {
+            var app = GLib.Application.get_default() as Cheese.Application;
+            if (app != null) {
+                app.toggle_auto_shoot();
+            }
+            return true;
+        }
+
         // Ctrl+0 or Alt+C: Reset brightness, contrast, hue, saturation, lux, canvas, and opacity
         bool alt_pressed = (event.state & Gdk.ModifierType.MOD1_MASK) != 0;
         bool ctrl_pressed = (event.state & Gdk.ModifierType.CONTROL_MASK) != 0;

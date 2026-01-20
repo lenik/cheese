@@ -351,6 +351,11 @@ public class Cheese.Application : Gtk.Application
         if (auto_shoot_enabled)
         {
             auto_shoot_id = GLib.Timeout.add (auto_shoot_interval, on_auto_shoot);
+            main_window.set_auto_shoot_indicator_visible (true);
+        }
+        else
+        {
+            main_window.set_auto_shoot_indicator_visible (false);
         }
     }
 
@@ -819,7 +824,7 @@ public class Cheese.Application : Gtk.Application
     /**
      * Show the keyboard shortcuts.
      */
-    private void on_shortcuts ()
+    public void on_shortcuts ()
     {
         if (shortcuts_window == null)
         {
@@ -842,6 +847,20 @@ public class Cheese.Application : Gtk.Application
         
         shortcuts_window.show_all ();
         shortcuts_window.present ();
+    }
+
+    /**
+     * Toggle auto-shoot functionality.
+     */
+    public void toggle_auto_shoot ()
+    {
+        auto_shoot_enabled = !auto_shoot_enabled;
+        setup_auto_shoot ();
+
+        // Update UI if needed
+        if (main_window != null) {
+            // Could add visual feedback here if needed
+        }
     }
 
     /**
@@ -911,7 +930,7 @@ public class Cheese.Application : Gtk.Application
             "artists", artists,
             "authors", authors,
             "comments", _("Take photos and videos with your webcam, with fun graphical effects"),
-            "copyright", "Copyright © 2011 - 2014 David King <amigadave@amigadave.com>\nCopyright © 2007 - 2011 daniel g. siegel <dgsiegel@gnome.org>",
+            "copyright", "Copyright © 2025-2026 Lenik Xie (谢继雷) <cheese@bodz.net>\nCopyright © 2011 - 2014 David King <amigadave@amigadave.com>\nCopyright © 2007 - 2011 daniel g. siegel <dgsiegel@gnome.org>",
             "documenters", documenters,
             "license-type", Gtk.License.GPL_2_0,
             "logo-icon-name", "org.gnome.Cheese",
